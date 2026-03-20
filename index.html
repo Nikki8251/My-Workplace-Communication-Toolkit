@@ -220,6 +220,10 @@
   .c-general   { background: var(--cat-general-bg);  color: var(--cat-general-tx); }
   .c-interview { background: var(--cat-interview-bg); color: var(--cat-interview-tx); }
 
+  .header-right { display:flex; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .lang-toggle { display:flex; border:1px solid rgba(200,169,110,0.4); border-radius:20px; overflow:hidden; }
+  .lang-btn { padding:4px 12px; font-size:12px; font-weight:500; font-family:'DM Sans',sans-serif; background:transparent; color:rgba(255,255,255,0.5); border:none; cursor:pointer; transition:all 0.15s; }
+  .lang-btn.active { background:rgba(200,169,110,0.25); color:var(--accent2); }
   @media (max-width: 600px) {
     h1 { font-size: 1.6rem; }
     header { padding: 1.75rem 1.25rem 1.5rem; }
@@ -234,10 +238,16 @@
   <div class="header-inner">
     <div class="header-top">
       <div>
-        <h1>职场<span>语料库</span></h1>
-        <p class="header-sub">Work &amp; Meeting Expressions</p>
+        <h1>Workplace<span> Toolkit</span></h1>
+        <p class="header-sub">职场英语表达语料库</p>
       </div>
-      <div class="total-badge" id="total-badge">共 500 条</div>
+      <div class="header-right">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+          <button class="lang-btn" id="btn-zh" onclick="setLang('zh')">中</button>
+        </div>
+        <div class="total-badge" id="total-badge">563 expressions</div>
+      </div>
     </div>
   </div>
 </header>
@@ -249,9 +259,9 @@
         <circle cx="7" cy="7" r="5" stroke="#1a1814" stroke-width="1.5"/>
         <path d="M11 11L14 14" stroke="#1a1814" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
-      <input type="search" id="search" placeholder="搜索表达或使用场景..." oninput="onSearch()" />
+      <input type="search" id="search" placeholder="Search expressions..." oninput="onSearch()" />
     </div>
-    <button class="btn-add" onclick="openModal()">+ 添加表达</button>
+    <button class="btn-add" onclick="openModal()" id="btn-add-label">+ Add</button>
   </div>
   <div class="filter-row" id="filter-row"></div>
 </div>
@@ -264,609 +274,646 @@
   <div class="pagination" id="pagination"></div>
 </main>
 
-<div class="toast" id="toast">已复制到剪贴板 ✓</div>
+<div class="toast" id="toast">Copied ✓</div>
 
 <div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <h3 id="modal-title">添加新表达</h3>
-    <div class="flabel">英文表达</div>
+    <h3 id="modal-title">Add Expression</h3>
+    <div class="flabel">Expression (English)</div>
     <textarea id="m-phrase" placeholder="e.g. Let's take this offline..."></textarea>
-    <div class="flabel">使用场景说明（中文）</div>
-    <input id="m-note" type="text" placeholder="e.g. 会议中建议私下讨论某话题" />
-    <div class="flabel">分类</div>
-    <select id="m-cat">
-      <option value="meeting">会议发言</option>
-      <option value="email">邮件书写</option>
-      <option value="feedback">反馈评价</option>
-      <option value="conflict">沟通异议</option>
-      <option value="present">汇报演示</option>
-      <option value="negotiate">谈判协商</option>
-      <option value="remote">远程协作</option>
-      <option value="general">通用职场</option>
-      <option value="interview">面试表达</option>
-    </select>
+    <div class="flabel">Note (English)</div>
+    <input id="m-note-en" type="text" placeholder="e.g. Suggest discussing privately after the meeting" />
+    <div class="flabel">说明（中文）</div>
+    <input id="m-note-zh" type="text" placeholder="e.g. 建议会后私下讨论" />
+    <div class="flabel" id="modal-cat-label">Category</div>
+    <select id="m-cat"></select>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">取消</button>
-      <button class="btn-save" id="modal-save-btn" onclick="saveModal()">添加</button>
+      <button class="btn-cancel" id="modal-cancel-btn" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" id="modal-save-btn" onclick="saveModal()">Add</button>
     </div>
   </div>
 </div>
 
 <script>
-const CATS = {
-  meeting:'会议发言', email:'邮件书写', feedback:'反馈评价',
-  conflict:'沟通异议', present:'汇报演示', negotiate:'谈判协商',
-  remote:'远程协作', general:'通用职场', interview:'面试表达'
-};
+const CATS_ZH = {meeting:'会议发言',email:'邮件书写',feedback:'反馈评价',conflict:'沟通异议',present:'汇报演示',negotiate:'谈判协商',remote:'远程协作',general:'通用职场',interview:'面试表达'};
+const CATS_EN = {meeting:'Meetings',email:'Emails',feedback:'Feedback',conflict:'Disagreement',present:'Presentations',negotiate:'Negotiation',remote:'Remote Work',general:'General',interview:'Interviews'};
+let lang = 'en';
+function getCats(){return lang==='zh'?CATS_ZH:CATS_EN;}
+function setLang(l){
+  lang=l;
+  document.getElementById('btn-en').classList.toggle('active',l==='en');
+  document.getElementById('btn-zh').classList.toggle('active',l==='zh');
+  const isZh=l==='zh';
+  document.getElementById('search').placeholder=isZh?'搜索表达或使用场景...':'Search expressions...';
+  document.getElementById('btn-add-label').textContent=isZh?'+ 添加表达':'+ Add';
+  document.getElementById('toast').textContent=isZh?'已复制到剪贴板 ✓':'Copied ✓';
+  render();
+}
 
 const RAW = [
-  ["Let's kick things off.","开场白，正式开始会议","meeting"],
-  ["Just to set the agenda for today...","说明今日会议议程","meeting"],
-  ["Let's take this offline.","建议私下继续讨论","meeting"],
-  ["Circle back on this later.","此议题稍后再议","meeting"],
-  ["Let's level-set before we dive in.","开始前先统一认知","meeting"],
-  ["Can we table that for now?","暂时搁置这个话题","meeting"],
-  ["Let's park that idea.","把这个想法先放一放","meeting"],
-  ["Can everyone hear me okay?","远程会议确认音频","meeting"],
-  ["I'll hand it over to Sarah.","将发言权交给他人","meeting"],
-  ["Does anyone have questions before we move on?","推进议程前询问是否有问题","meeting"],
-  ["Let me make sure I'm capturing this correctly.","确认自己的理解和记录是否准确","meeting"],
-  ["What's the action item here?","确认会议结论与行动项","meeting"],
-  ["Who's taking ownership of this?","确认负责人","meeting"],
-  ["Can we get a quick show of hands?","快速表决","meeting"],
-  ["Let's go around the room.","依次让每人发言","meeting"],
-  ["I'd like to add something to that.","补充上一位发言人的内容","meeting"],
-  ["That resonates with me.","表示认同","meeting"],
-  ["Can you walk us through your thinking?","请对方解释思路","meeting"],
-  ["Let's make sure we're aligned on this.","确认团队对此达成一致","meeting"],
-  ["I think we're getting off track.","提醒讨论跑题了","meeting"],
-  ["Let's bring it back to the main point.","把讨论拉回主题","meeting"],
-  ["We're running low on time.","提醒时间不够了","meeting"],
-  ["Let's wrap up with key takeaways.","总结会议要点","meeting"],
-  ["Can we schedule a follow-up?","建议安排后续会议","meeting"],
-  ["I'll send out the meeting notes afterward.","会后我来发会议纪要","meeting"],
-  ["Let me quickly recap what we've discussed.","快速回顾讨论内容","meeting"],
-  ["Does that work for everyone?","确认方案是否对所有人都合适","meeting"],
-  ["Any objections before we move forward?","推进前确认无异议","meeting"],
-  ["Let's make this decision today.","推动当场拍板","meeting"],
-  ["Can we set a deadline for this?","建议明确截止日期","meeting"],
-  ["What are the blockers here?","询问阻碍因素","meeting"],
-  ["What's the priority order?","询问优先级","meeting"],
-  ["Let's align on the timeline.","统一时间线","meeting"],
-  ["I think we need to revisit our assumptions.","建议重新审视假设","meeting"],
-  ["Can you give us a quick status update?","请对方简要更新进展","meeting"],
-  ["Let's do a quick check-in.","简短进度确认","meeting"],
-  ["I'd like to build on what you said.","在对方发言基础上延伸","meeting"],
-  ["That's a great segue into our next topic.","顺势引入下一议题","meeting"],
-  ["Let's put this to a vote.","提议投票决定","meeting"],
-  ["Can we timebox this discussion?","建议限时讨论","meeting"],
-  ["I'm going to stop sharing my screen.","停止屏幕共享","meeting"],
-  ["Could you pull up the slides?","请对方切换到幻灯片","meeting"],
-  ["Let me share my screen.","开始共享屏幕","meeting"],
-  ["Sorry, I was on mute.","解释刚才静音了","meeting"],
-  ["You're breaking up a bit.","提醒对方网络不稳定","meeting"],
-  ["Can you repeat that? There was some lag.","请对方重复，因为有延迟","meeting"],
-  ["Let's give it a moment for everyone to join.","等待其他人进入会议","meeting"],
-  ["We have a hard stop at 3pm.","强调会议必须在某时间结束","meeting"],
-  ["Let's use the last five minutes for open questions.","留出时间做自由提问","meeting"],
-  ["I'll send a calendar invite for the follow-up.","告知会发送日历邀请","meeting"],
-  ["Before we close, any final thoughts?","结束前征集最后意见","meeting"],
-  ["Can we do a quick retrospective?","建议做简短复盘","meeting"],
-  ["Let's be mindful of the time.","提醒注意时间","meeting"],
-  ["I'd love to get everyone's perspective on this.","征集所有人意见","meeting"],
-  ["What's the biggest risk we're overlooking?","询问被忽视的最大风险","meeting"],
-  ["Let's stress-test that assumption.","对某假设进行压力测试/挑战","meeting"],
-  ["Who are the key stakeholders we need to loop in?","确认需要知会的利益相关方","meeting"],
-  ["What does success look like for this initiative?","明确成功标准","meeting"],
-  ["Let's document this decision.","记录这个决定","meeting"],
-  ["Can we capture the rationale?","建议记录决策依据","meeting"],
-  ["I want to flag a dependency here.","提示某个依赖关系","meeting"],
-  ["This is a blocker for my team.","说明某事项是本团队的阻碍","meeting"],
-  ["Can we escalate this?","建议上报此问题","meeting"],
-  ["Let's keep the momentum going.","保持推进势头","meeting"],
-  ["I'll take an action item on that.","我来负责跟进这一项","meeting"],
-  ["Can we assign owners before we leave?","散会前确认负责人","meeting"],
-  ["Let's not boil the ocean here.","不要把事情搞得过于复杂","meeting"],
-  ["We need to be more concrete.","要求讨论更加具体","meeting"],
-  ["Let's not get lost in the weeds.","不要纠结于细节","meeting"],
-  ["Let's zoom out for a second.","从宏观视角看问题","meeting"],
-  ["Can we double-click on that?","建议深入讨论某点","meeting"],
-  ["I want to make sure we're solving the right problem.","确认是否在解决正确问题","meeting"],
-  ["Let's put a pin in that.","暂时标记此话题，稍后讨论","meeting"],
-  ["Any dependencies we should flag?","有没有需要提示的依赖项","meeting"],
-  ["What's the north star here?","询问核心目标是什么","meeting"],
-  ["Let's pressure-test this plan.","对方案进行审查","meeting"],
-  ["Is there anything blocking us from moving forward?","确认是否有阻碍推进的因素","meeting"],
-  ["Let's do a quick sanity check.","做一个快速的合理性检验","meeting"],
-  ["Hope this email finds you well.","邮件开场问候语","email"],
-  ["I'm reaching out regarding...","说明邮件目的","email"],
-  ["Following up on our conversation...","跟进此前的对话","email"],
-  ["Please find attached...","提示附件","email"],
-  ["As per my last email...","提醒对方查阅上封邮件","email"],
-  ["Just wanted to touch base.","礼貌地确认进展","email"],
-  ["Happy to jump on a call if that's easier.","建议改用电话/视频","email"],
-  ["Could you loop in the relevant team?","请对方抄送相关团队","email"],
-  ["I'm CC'ing Sarah for visibility.","抄送他人说明","email"],
-  ["Please let me know if you have any questions.","邮件结尾常用语","email"],
-  ["Looking forward to your reply.","期待回复","email"],
-  ["Let me know your availability.","询问对方时间","email"],
-  ["I'll keep you posted.","告知会持续跟进","email"],
-  ["Thanks for the heads-up.","感谢提前告知","email"],
-  ["Apologies for the delayed response.","为延迟回复致歉","email"],
-  ["As discussed, please find the summary below.","如所讨论，摘要如下","email"],
-  ["Can you confirm receipt?","请对方确认已收到","email"],
-  ["Kind regards","邮件结尾礼貌用语","email"],
-  ["Best,","简洁结尾用语","email"],
-  ["To whom it may concern,","不知收件人姓名时的开头","email"],
-  ["I wanted to bring this to your attention.","希望引起对方注意","email"],
-  ["Please advise.","请对方给出建议或指示","email"],
-  ["Further to my previous email...","在上封邮件基础上补充","email"],
-  ["I'll circle back by end of week.","我本周末前跟进","email"],
-  ["Just a gentle reminder...","礼貌提醒","email"],
-  ["As agreed...","如之前商定的","email"],
-  ["For your reference...","仅供参考","email"],
-  ["Please revert at your earliest convenience.","请尽早回复","email"],
-  ["I appreciate your patience.","感谢对方的耐心","email"],
-  ["I hope you had a great weekend.","周一邮件开场白","email"],
-  ["Thank you for your prompt response.","感谢对方的快速回复","email"],
-  ["Could you please provide an update by Friday?","要求在某时间前更新进展","email"],
-  ["I'll take it from here.","告知后续由我跟进","email"],
-  ["Please see the details inline.","指示回复内容在邮件内嵌","email"],
-  ["Moving Sarah to BCC.","将某人移至密送","email"],
-  ["Adding Tom to the thread for context.","将他人加入邮件串","email"],
-  ["As a quick heads-up...","简短提前告知","email"],
-  ["Wanted to flag something quickly.","提示需要关注的事项","email"],
-  ["I'll defer to your judgment on this.","此事我以对方决定为准","email"],
-  ["Happy to discuss further if needed.","需要时可进一步讨论","email"],
-  ["Please note that...","请注意以下事项","email"],
-  ["I trust this answers your question.","相信这回答了你的问题","email"],
-  ["Do not hesitate to reach out.","鼓励对方随时联系","email"],
-  ["I'd appreciate your input on this.","希望得到对方的意见","email"],
-  ["Just a quick note to say...","简短说明某事","email"],
-  ["This is time-sensitive.","此事较为紧急","email"],
-  ["Can you take a look and share your thoughts?","请对方查阅并反馈","email"],
-  ["I've gone ahead and done X.","告知已提前完成某事","email"],
-  ["Let me know if this works for you.","确认方案是否合适","email"],
-  ["Copying my manager for awareness.","抄送上级以便知悉","email"],
-  ["Thank you for bringing this to my attention.","感谢对方提醒","email"],
-  ["I'll need a bit more time on this.","告知需要更多时间","email"],
-  ["Is Friday at 2pm workable?","建议具体会议时间","email"],
-  ["Let me know if you need anything else.","邮件收尾，提供进一步支持","email"],
-  ["I'll follow up early next week.","下周初跟进","email"],
-  ["I apologize for any confusion.","为造成困惑致歉","email"],
-  ["Can we connect briefly this week?","本周是否可以简短通话","email"],
-  ["Thanks for the context.","感谢提供背景信息","email"],
-  ["I'll action this right away.","我马上处理这件事","email"],
-  ["No action needed from your end.","无需对方采取任何行动","email"],
-  ["I'm flagging this for your awareness.","仅供知悉，无需行动","email"],
-  ["Happy to elaborate if needed.","需要时可进一步解释","email"],
-  ["Thank you for your continued support.","感谢持续的支持","email"],
-  ["We'll keep you in the loop.","会持续知会对方","email"],
-  ["I'll be out of office from Mon–Wed.","告知休假安排","email"],
-  ["For urgent matters, please contact Sarah.","告知紧急联系人","email"],
-  ["I'll pick this up when I'm back.","回来后继续处理","email"],
-  ["Thanks for looping me in.","感谢被纳入邮件抄送","email"],
-  ["Can we reconnect on this next week?","建议下周再跟进","email"],
-  ["That's a really solid piece of work.","称赞工作质量高","feedback"],
-  ["I appreciate your candid feedback.","感谢坦诚的反馈","feedback"],
-  ["Here's what's working well...","说明做得好的地方","feedback"],
-  ["Here's where I think there's room to grow.","指出可以改进的空间","feedback"],
-  ["I'd love to see more initiative on your end.","希望对方表现出更多主动性","feedback"],
-  ["The output was good, but the process needs work.","结果不错，但过程需要改进","feedback"],
-  ["You're on the right track.","说明方向正确","feedback"],
-  ["I want to acknowledge the effort you put into this.","肯定对方付出的努力","feedback"],
-  ["This exceeded my expectations.","超出了我的预期","feedback"],
-  ["This fell a bit short of what we were looking for.","没有完全达到预期","feedback"],
-  ["Next time, I'd suggest...","下次建议...","feedback"],
-  ["Can I share some observations?","礼貌请求给出反馈","feedback"],
-  ["I noticed that...","提出观察到的问题","feedback"],
-  ["One area to watch is...","指出需要注意的方面","feedback"],
-  ["Your communication has really improved.","肯定沟通能力的提升","feedback"],
-  ["I think the analysis could go deeper.","分析可以更加深入","feedback"],
-  ["The structure was clear and easy to follow.","称赞逻辑结构清晰","feedback"],
-  ["The conclusion felt a bit rushed.","结论部分显得有些仓促","feedback"],
-  ["You handled that situation really well.","肯定对方处理某情况的方式","feedback"],
-  ["I'd encourage you to speak up more in meetings.","鼓励对方在会议中更积极发言","feedback"],
-  ["Your attention to detail is impressive.","称赞细心认真","feedback"],
-  ["I think there were some missed opportunities here.","指出未把握到的机会","feedback"],
-  ["Great job staying calm under pressure.","称赞在压力下保持冷静","feedback"],
-  ["I'd like to give you some constructive feedback.","要给出建设性反馈","feedback"],
-  ["The delivery was great; the content needs refining.","表达方式很好，内容需要打磨","feedback"],
-  ["You're a real asset to this team.","你是团队的重要财富","feedback"],
-  ["I think you could delegate more effectively.","建议对方更有效地授权委托","feedback"],
-  ["This is exactly what we needed.","完全符合需求","feedback"],
-  ["I'd like to see this revisited.","建议重新审视","feedback"],
-  ["The timeline wasn't quite met.","未能按时完成","feedback"],
-  ["Your energy in meetings is contagious.","称赞在会议中的积极感染力","feedback"],
-  ["I think you need to manage up a bit more.","建议对方更好地向上管理","feedback"],
-  ["You're showing real leadership here.","展现出真正的领导力","feedback"],
-  ["I want to make sure we're setting you up for success.","确保为对方创造成功条件","feedback"],
-  ["What do you think went well?","请对方自我评估亮点","feedback"],
-  ["What would you do differently next time?","请对方反思改进点","feedback"],
-  ["How are you feeling about your workload?","关心对方的工作量状态","feedback"],
-  ["I want this to be a two-way conversation.","强调反馈是双向的","feedback"],
-  ["Your growth this quarter has been remarkable.","肯定本季度明显的成长","feedback"],
-  ["I think you're ready for more responsibility.","认为对方已准备好承担更多责任","feedback"],
-  ["One piece of feedback I consistently hear is...","传递他人反复提到的反馈","feedback"],
-  ["I want to be direct with you.","直接切入主题","feedback"],
-  ["This isn't the standard we expect.","说明未达到预期标准","feedback"],
-  ["I have high expectations of you because I believe in your potential.","解释高标准的原因是看好对方潜力","feedback"],
-  ["Let's set some clear goals together.","一起制定明确目标","feedback"],
-  ["I need you to take more ownership.","要求对方更主动承担责任","feedback"],
-  ["You tend to over-explain in presentations.","指出汇报中有过度解释的倾向","feedback"],
-  ["You're great at the technical side; let's work on the narrative.","技术强，但需要提升叙事能力","feedback"],
-  ["I want to acknowledge how much you've grown.","肯定对方的成长","feedback"],
-  ["This is the kind of work I love to see from you.","这正是我希望看到的你的工作状态","feedback"],
-  ["I think you're underselling yourself.","指出对方低估了自己","feedback"],
-  ["Your instincts here were spot on.","称赞判断力准确","feedback"],
-  ["Let's make sure this doesn't happen again.","确保类似情况不再发生","feedback"],
-  ["I need you to be more proactive in flagging issues.","需要对方更主动地提出问题","feedback"],
-  ["Your stakeholder management has been excellent.","称赞利益相关方管理出色","feedback"],
-  ["This is a strong first draft.","称赞初稿质量","feedback"],
-  ["There are a few areas that need tightening up.","有几个地方需要打磨收紧","feedback"],
-  ["I'm proud of how you handled that.","为对方的处理方式感到自豪","feedback"],
-  ["You've really hit your stride.","称赞已进入最佳状态","feedback"],
-  ["I see a real step change in your performance.","称赞表现有了质的飞跃","feedback"],
-  ["I'd like to push back on that.","礼貌提出异议","conflict"],
-  ["I see where you're coming from, but...","理解对方立场，但有不同意见","conflict"],
-  ["I have some concerns I'd like to share.","表达顾虑","conflict"],
-  ["I think there might be a misunderstanding.","指出可能存在误解","conflict"],
-  ["Let's find a middle ground.","寻求折中方案","conflict"],
-  ["I hear you, and I want to make sure we're on the same page.","确认双方理解一致","conflict"],
-  ["With respect, I disagree.","礼貌表示不同意","conflict"],
-  ["Can I offer a different perspective?","提出不同视角","conflict"],
-  ["I think we might be talking past each other.","指出沟通出现了偏差","conflict"],
-  ["I want to address the elephant in the room.","正面处理大家都不说的问题","conflict"],
-  ["This doesn't sit right with me.","表达内心的不适或不认同","conflict"],
-  ["I have a different reading of the situation.","表达对情况的不同理解","conflict"],
-  ["I'm not sure I fully agree with that assessment.","委婉表示不完全认同","conflict"],
-  ["Can we revisit this decision?","建议重新审视某决定","conflict"],
-  ["I need to be transparent about my reservations.","表达保留意见","conflict"],
-  ["I feel like my concerns aren't being heard.","表达感觉意见未被重视","conflict"],
-  ["I want to flag a potential issue.","提示潜在问题","conflict"],
-  ["I think we're moving too fast on this.","认为推进过于仓促","conflict"],
-  ["I'm worried about the downstream impact.","担心后续影响","conflict"],
-  ["I'd like us to pressure-test this assumption.","建议挑战某个假设","conflict"],
-  ["I want to make sure we've considered all options.","确认已考虑所有选项","conflict"],
-  ["That approach carries some risk I want to highlight.","指出某方法的风险","conflict"],
-  ["I don't think this is the right call.","认为这个决定是错误的","conflict"],
-  ["I feel strongly about this.","表达坚定立场","conflict"],
-  ["I'd like to understand the reasoning better.","请对方解释原因","conflict"],
-  ["I think we need more data before we decide.","建议在更多数据支持下再决定","conflict"],
-  ["I want to be clear about where I stand.","明确表达自己的立场","conflict"],
-  ["Can we agree to disagree on this one?","建议在此问题上各自保留意见","conflict"],
-  ["I appreciate you raising that, but my view is different.","感谢对方提出，但表达不同意见","conflict"],
-  ["I think we need a mediator here.","建议引入中立方调解","conflict"],
-  ["I want to resolve this constructively.","希望建设性地解决问题","conflict"],
-  ["I'm open to being convinced, but I'm not there yet.","开放态度，但尚未被说服","conflict"],
-  ["Let's separate the issue from the person.","区分问题与个人","conflict"],
-  ["I don't want this to become adversarial.","不希望演变成对立关系","conflict"],
-  ["I think we can both win here.","强调可以找到双赢方案","conflict"],
-  ["Can we take the emotion out of this?","建议理性讨论","conflict"],
-  ["I want to understand your priorities.","了解对方的优先考量","conflict"],
-  ["I'm not trying to be difficult.","说明自己并非故意刁难","conflict"],
-  ["I just want to make sure we've thought this through.","确保经过深思熟虑","conflict"],
-  ["I have a different set of constraints.","说明自己有不同的限制条件","conflict"],
-  ["I think the data tells a different story.","用数据提出不同结论","conflict"],
-  ["That's not aligned with our team's goals.","指出与团队目标不符","conflict"],
-  ["I'm going to need more time to think about this.","表示需要更多时间考虑","conflict"],
-  ["I want to make sure we don't regret this decision.","确保不会后悔这个决定","conflict"],
-  ["I'd prefer a more collaborative approach.","表达希望更具协作性的方式","conflict"],
-  ["I'm not comfortable with this direction.","表达对该方向感到不安","conflict"],
-  ["I don't think that's a fair characterization.","认为对方的描述不够准确","conflict"],
-  ["I want to address this head-on.","直接面对和处理问题","conflict"],
-  ["I think there's a better way to handle this.","认为有更好的处理方式","conflict"],
-  ["Let's focus on solutions, not blame.","聚焦解决方案而非责任追究","conflict"],
-  ["I'd like to understand the full picture before responding.","希望了解全貌再作回应","conflict"],
-  ["I hear your frustration.","表达对对方挫败感的理解","conflict"],
-  ["I want us to come out of this stronger.","希望经此更加团结","conflict"],
-  ["Can we reset and start fresh?","建议重新开始讨论","conflict"],
-  ["I think we owe each other more clarity here.","双方都需要更清晰的沟通","conflict"],
-  ["Today I'll be walking you through...","介绍汇报内容","present"],
-  ["Let me give you a quick overview.","提供简要概述","present"],
-  ["The key takeaway here is...","指出核心结论","present"],
-  ["Let's look at the data.","切换到数据","present"],
-  ["As you can see from this slide...","引导听众关注幻灯片内容","present"],
-  ["I'll dive into the details in a moment.","告知稍后深入讲解","present"],
-  ["To put this in context...","提供背景信息","present"],
-  ["Here's what this means for us.","说明对团队/公司的含义","present"],
-  ["Let me highlight three points.","强调三个要点","present"],
-  ["This is the problem we're solving.","阐明正在解决的问题","present"],
-  ["Here's our proposed solution.","提出解决方案","present"],
-  ["The numbers speak for themselves.","数据不言而喻","present"],
-  ["Let me put this in perspective.","帮助听众正确理解数据规模","present"],
-  ["Here's the before and after.","展示对比效果","present"],
-  ["Let's zoom in on this chart.","放大查看图表","present"],
-  ["I want to call out something important.","指出重要之处","present"],
-  ["Here's the bottom line.","说明最终结论","present"],
-  ["The headline number is...","给出最关键的数字","present"],
-  ["We exceeded our target by X%.","超额完成目标","present"],
-  ["We fell short of our target.","未达目标","present"],
-  ["Here's our recommendation.","提出建议","present"],
-  ["There are three options on the table.","列出三个备选方案","present"],
-  ["Our preferred path forward is...","我们倾向的推进方式","present"],
-  ["The risks are manageable.","风险是可控的","present"],
-  ["Here's the investment required.","说明所需投入","present"],
-  ["The ROI looks compelling.","投资回报率具有吸引力","present"],
-  ["We're asking for your approval to proceed.","请求批准推进","present"],
-  ["Any questions so far?","中途询问是否有问题","present"],
-  ["I'll take questions at the end.","告知提问环节在最后","present"],
-  ["Let me pause here for reactions.","在此暂停，听取反馈","present"],
-  ["I want to be upfront about the challenges.","坦诚说明面临的挑战","present"],
-  ["This is a work in progress.","说明仍在进行中","present"],
-  ["We're seeking feedback at this stage.","当前阶段征求意见","present"],
-  ["Here's where we need your input.","需要对方在此给出意见","present"],
-  ["Let me summarize.","做总结","present"],
-  ["To recap the key points...","回顾要点","present"],
-  ["Our next steps are...","说明后续行动","present"],
-  ["We'll reconvene in four weeks.","告知下次跟进时间","present"],
-  ["I'll send out the deck afterward.","会后发送演示文稿","present"],
-  ["Thank you for your time and attention.","感谢听众","present"],
-  ["I'm happy to take any questions.","开放提问","present"],
-  ["That's a great question.","正面回应提问","present"],
-  ["I want to make sure I answer that fully.","确保全面回答问题","present"],
-  ["Let me come back to that.","稍后回答该问题","present"],
-  ["I don't have that data on hand, but I'll follow up.","当前没有该数据，但会后跟进","present"],
-  ["This slide tells a story.","说明该幻灯片有内在逻辑","present"],
-  ["The trend is encouraging.","趋势令人鼓舞","present"],
-  ["The trend is concerning.","趋势令人担忧","present"],
-  ["We attribute this to...","将此归因于...","present"],
-  ["This is a leading indicator.","这是一个领先指标","present"],
-  ["The year-over-year growth is...","同比增长为...","present"],
-  ["Benchmarked against the industry...","与行业基准比较","present"],
-  ["We outperformed our competitors.","超越了竞争对手","present"],
-  ["Here's the risk matrix.","展示风险矩阵","present"],
-  ["We've stress-tested the model.","对模型进行了压力测试","present"],
-  ["The assumptions underpinning this are...","支撑此结论的假设是...","present"],
-  ["This is a conservative estimate.","这是一个保守估计","present"],
-  ["We see significant upside here.","此处有显著的上行空间","present"],
-  ["Let me hand over to my colleague.","将汇报交给同事继续","present"],
-  ["I'll be taking you through sections one and two.","说明自己负责的部分","present"],
-  ["What are your key priorities here?","了解对方最重要的诉求","negotiate"],
-  ["Here's what I can offer.","说明可以提供的条件","negotiate"],
-  ["What would it take to make this work?","询问达成协议的条件","negotiate"],
-  ["We're flexible on X if you can move on Y.","就某项提出互换条件","negotiate"],
-  ["That's outside our budget.","表示超出预算","negotiate"],
-  ["Can we explore a phased approach?","建议分阶段推进","negotiate"],
-  ["Is there any room to move on price?","询问价格是否有弹性","negotiate"],
-  ["I need to take this back to my team.","需要与团队商讨","negotiate"],
-  ["We're committed to making this partnership work.","强调对合作的承诺","negotiate"],
-  ["What's the best you can do?","询问对方最优条件","negotiate"],
-  ["I think we're close to a deal.","表示即将达成协议","negotiate"],
-  ["Can we agree on a trial period?","建议试行期","negotiate"],
-  ["Let's put the headline terms on paper.","建议先把主要条款落实到纸面","negotiate"],
-  ["I'd like to build in some flexibility.","希望保留一些弹性空间","negotiate"],
-  ["That's a firm number for us.","说明某数字是硬性条件","negotiate"],
-  ["What's the value you're seeing here?","询问对方看到的价值","negotiate"],
-  ["Can we find a creative solution?","建议寻找创新解决方案","negotiate"],
-  ["I want to make sure both sides win.","强调追求双赢","negotiate"],
-  ["We'd be open to a longer-term commitment for a better rate.","提出以长期承诺换取更优惠价格","negotiate"],
-  ["What's non-negotiable for you?","询问对方的底线","negotiate"],
-  ["We can work with that.","表示可以接受对方条件","negotiate"],
-  ["That's a tough ask.","承认对方要求很高","negotiate"],
-  ["Let me see what I can do.","表示会尽力争取","negotiate"],
-  ["We'd need something in return.","提出需要相应回报","negotiate"],
-  ["Can we revisit the scope instead?","建议调整范围而非价格","negotiate"],
-  ["I think there's value in moving quickly.","强调尽快推进的价值","negotiate"],
-  ["Let's agree on the key points first.","建议先就核心条款达成一致","negotiate"],
-  ["Is there anything stopping you from signing today?","询问是否有阻碍当场签约的因素","negotiate"],
-  ["We have some flexibility on the timeline.","时间线上有一定弹性","negotiate"],
-  ["Can we structure this as a pilot?","建议以试点形式推进","negotiate"],
-  ["What would help you feel confident?","询问如何让对方更有信心","negotiate"],
-  ["I understand your constraints.","表示理解对方的限制","negotiate"],
-  ["Can we split the difference?","建议各退一步","negotiate"],
-  ["That works if we can also have...","接受条件，附加提出其他要求","negotiate"],
-  ["We're prepared to move quickly.","表示可以快速推进","negotiate"],
-  ["What does your decision-making process look like?","了解对方的决策流程","negotiate"],
-  ["Who else is involved in this decision?","了解其他决策参与者","negotiate"],
-  ["I'd like to propose something slightly different.","提出不同方案","negotiate"],
-  ["Let me put a proposal together.","表示会整理一份方案","negotiate"],
-  ["We're aligned on the goal; it's the terms we need to work through.","目标一致，需要商讨的是条款","negotiate"],
-  ["I think we can get there.","相信可以达成协议","negotiate"],
-  ["This is a significant investment for us.","强调这对我们是重大投入","negotiate"],
-  ["What's the cost of not doing this?","分析不行动的代价","negotiate"],
-  ["We've done our homework on this.","表明已做过充分调研","negotiate"],
-  ["Let's get something drafted.","建议起草方案","negotiate"],
-  ["I'd like to revisit the payment terms.","提出重新讨论付款条件","negotiate"],
-  ["Can we agree on a 30-day review clause?","建议加入30天审查条款","negotiate"],
-  ["I want to be transparent about our position.","坦诚说明己方立场","negotiate"],
-  ["We're not in a position to go below that.","表示无法低于该底线","negotiate"],
-  ["I think that's a fair ask.","认为这个要求合理","negotiate"],
-  ["Let me check with my stakeholders.","告知需要与相关方确认","negotiate"],
-  ["We'd be willing to sweeten the deal with...","表示愿意在某项上让步","negotiate"],
-  ["Let's shake on it.","表示达成协议","negotiate"],
-  ["I'll have the contract drawn up.","告知将安排起草合同","negotiate"],
-  ["Looking forward to working together.","表达对合作的期待","negotiate"],
-  ["Can everyone see my screen?","确认屏幕共享是否正常","remote"],
-  ["You're on mute.","提醒对方已静音","remote"],
-  ["I think you're on mute — we can't hear you.","提醒对方无法听到其声音","remote"],
-  ["Sorry, I had connectivity issues.","解释网络问题","remote"],
-  ["Can you drop the link in the chat?","请对方在聊天框贴链接","remote"],
-  ["I'll share my screen now.","告知开始共享屏幕","remote"],
-  ["Let's use the whiteboard.","建议使用白板协作","remote"],
-  ["Can you see the document I shared?","确认文件共享是否正常","remote"],
-  ["I'll drop the notes in Slack.","告知会在Slack发送记录","remote"],
-  ["Let's keep this async.","建议异步沟通","remote"],
-  ["I'll record this for those who can't join.","告知会录制会议","remote"],
-  ["Is the recording on?","确认是否在录制","remote"],
-  ["Let's do a quick round of intros for those joining remotely.","为远程参会者做自我介绍","remote"],
-  ["Can you bump up the font size on your screen?","请对方放大字体","remote"],
-  ["Sorry for the background noise.","为背景噪音道歉","remote"],
-  ["I'll be joining from a different time zone.","告知不同时区参会","remote"],
-  ["What time is that in your timezone?","询问对方时区的时间","remote"],
-  ["Can we find a time that works for everyone?","协调各方都方便的时间","remote"],
-  ["I'll send a Loom instead of scheduling a meeting.","用录制视频代替会议","remote"],
-  ["Let's keep this in writing for clarity.","建议书面记录以保证清晰","remote"],
-  ["I'll update the shared doc.","告知会更新共享文档","remote"],
-  ["Can you assign that to me in Asana/Jira?","请对方在任务工具中分配任务","remote"],
-  ["Let's sync up on a quick call.","建议简短通话同步","remote"],
-  ["I'll ping you on Slack.","告知会在Slack联系","remote"],
-  ["Feel free to comment directly on the doc.","邀请直接在文档上评论","remote"],
-  ["I've added comments inline.","告知已添加行内评论","remote"],
-  ["Let's use the reaction emojis to vote.","用表情反应来投票","remote"],
-  ["I'll set up a shared Notion page.","告知会建立共享页面","remote"],
-  ["Can you check the calendar invite for the details?","请对方查看日历邀请获取详情","remote"],
-  ["The agenda is in the invite.","议程在日历邀请中","remote"],
-  ["Let's do a written check-in this week instead of a call.","本周用书面更新代替通话","remote"],
-  ["I'll be heads-down for the next few hours.","告知接下来几小时专注工作","remote"],
-  ["My status will be on Do Not Disturb.","告知已设置勿扰状态","remote"],
-  ["Feel free to async this in Slack if it's not urgent.","非紧急事项请发Slack异步处理","remote"],
-  ["I'll share the recording link afterward.","会后发送录制链接","remote"],
-  ["Can you add timestamps to the recording?","请对方为录制添加时间戳","remote"],
-  ["Let's create a shared action item list.","建立共享行动项列表","remote"],
-  ["I've updated the project board.","告知已更新项目看板","remote"],
-  ["Can we move this to a Slack thread?","建议在Slack线程中继续讨论","remote"],
-  ["Let's keep all updates in one place.","建议集中管理所有更新","remote"],
-  ["I'll get back to you on that.","稍后回复对方","general"],
-  ["Let me look into this.","我去了解一下","general"],
-  ["Can you give me the full picture?","请对方提供完整信息","general"],
-  ["What's the best way to approach this?","询问最佳处理方式","general"],
-  ["Let's be strategic about this.","建议战略性地处理","general"],
-  ["What's the end goal here?","明确最终目标","general"],
-  ["I want to make sure we're solving the right problem.","确认解决的是正确问题","general"],
-  ["Let's not reinvent the wheel.","不要重复造轮子","general"],
-  ["What's the MVP here?","询问最小可行方案","general"],
-  ["Let's move the needle on this.","推动取得实质进展","general"],
-  ["We need to be more data-driven.","需要更多依据数据决策","general"],
-  ["Let's keep it simple.","保持简单","general"],
-  ["What are the trade-offs?","有哪些权衡取舍","general"],
-  ["Let's weigh the pros and cons.","权衡利弊","general"],
-  ["What's the opportunity cost?","机会成本是什么","general"],
-  ["Let's build a business case.","建议撰写商业案例","general"],
-  ["Who are the key decision-makers?","谁是关键决策者","general"],
-  ["We need executive buy-in.","需要高层的支持","general"],
-  ["Let's get cross-functional alignment.","需要跨部门对齐","general"],
-  ["I'll need to loop in Legal.","需要知会法务部门","general"],
-  ["This needs sign-off from Finance.","需要财务部门批准","general"],
-  ["Let's make sure compliance is happy.","确保合规部门没有异议","general"],
-  ["What's our runway on this?","我们还有多少时间/资源","general"],
-  ["We're resource-constrained right now.","目前资源有限","general"],
-  ["Let's be realistic about scope.","对范围保持现实","general"],
-  ["We need to manage expectations.","需要管理预期","general"],
-  ["What's the impact vs. effort ratio?","影响力与投入的比例如何","general"],
-  ["Let's prioritize ruthlessly.","要无情地排列优先级","general"],
-  ["What's in scope vs. out of scope?","什么在范围内，什么在范围外","general"],
-  ["Let's define success metrics upfront.","提前定义成功指标","general"],
-  ["We need to be more agile.","需要更敏捷","general"],
-  ["Let's do a post-mortem.","做事后复盘","general"],
-  ["What's the root cause?","根本原因是什么","general"],
-  ["We need to mitigate this risk.","需要降低这个风险","general"],
-  ["Let's build in a contingency.","建议留出应急预案","general"],
-  ["What's plan B?","B计划是什么","general"],
-  ["We're in good shape on this.","这一项进展良好","general"],
-  ["We're at risk of missing the deadline.","有错过截止日期的风险","general"],
-  ["I'll escalate this if needed.","必要时我会上报","general"],
-  ["This is a quick win.","这是一个容易实现的成果","general"],
-  ["Let's celebrate this win.","庆祝这个成果","general"],
-  ["This is a learning moment.","这是一个学习的机会","general"],
-  ["Let's fail fast and iterate.","快速试错，快速迭代","general"],
-  ["We need to ship this.","需要发布上线","general"],
-  ["What's blocking us?","是什么在阻碍我们","general"],
-  ["Let's clear the backlog.","清理积压任务","general"],
-  ["What's the latest on this?","最新进展如何","general"],
-  ["Can you give me a quick update?","简要更新一下进展","general"],
-  ["We're on track.","进展顺利，在计划内","general"],
-  ["We're slightly behind but recovering.","略有落后，但正在追赶","general"],
-  ["I appreciate your flexibility.","感谢对方的灵活配合","general"],
-  ["Thank you for your patience.","感谢对方的耐心","general"],
-  ["I'll own this.","我来负责这件事","general"],
-  ["That's on me.","这是我的责任","general"],
-  ["I'll make it right.","我会弥补这个问题","general"],
-  ["Let's not point fingers.","不要互相指责","general"],
-  ["Let's focus on solutions.","专注于解决方案","general"],
-  ["I'm confident we can figure this out.","相信我们能解决","general"],
-  ["Let's think outside the box.","换个思路想想","general"],
-  ["That's a great insight.","这是很棒的洞察","general"],
-  ["I hadn't thought of it that way.","我没从那个角度想过","general"],
-  ["Let's sanity-check that.","做一个合理性检验","general"],
-  ["Does this pass the smell test?","这经得起推敲吗","general"],
-  ["Let's gut-check this decision.","直觉上检验一下这个决定","general"],
-  ["I think we're overthinking this.","我觉得我们想太多了","general"],
-  ["Let's keep the big picture in mind.","要时刻记住大局","general"],
-  ["How does this ladder up to our goals?","这如何支撑我们的整体目标","general"],
-  ["This isn't strategic enough.","这还不够具有战略性","general"],
-  ["Let's make this scalable.","确保这是可扩展的","general"],
-  ["We need a sustainable solution.","需要可持续的解决方案","general"],
-  ["This is a band-aid fix.","这只是权宜之计","general"],
-  ["We need to fix the root issue.","需要解决根本问题","general"],
-  ["Great minds think alike!","英雄所见略同","general"],
-  ["I'm fully aligned with that.","我完全赞同","general"],
-  ["You took the words right out of my mouth.","你说出了我想说的话","general"],
-  ["That's exactly where I was going.","这正是我想说的方向","general"],
-  ["I'll defer to your expertise here.","此处我以你的专业判断为准","general"],
-  ["I trust your judgment.","我相信你的判断","general"],
-  ["Can I get your two cents?","能听听你的看法吗","general"],
-  ["Happy to brainstorm together.","乐意一起头脑风暴","general"],
-  ["Let's ideate on this.","就此展开创意讨论","general"],
-  ["What's your gut feeling?","你的直觉是什么","general"],
-  ["I want to be upfront about this.","我想直接说明这件事","general"],
-  ["Let's set some ground rules.","制定一些基本规则","general"],
-  ["I'll hold you to that.","我会记住你说的","general"],
-  ["You can count on me.","你可以依靠我","general"],
-  ["Tell me about yourself.","请介绍一下你自己（经典开场问题）","interview"],
-  ["I'd describe myself as someone who...","自我介绍时描述自己的特质","interview"],
-  ["I've spent the past X years working in...","介绍过去的工作经历","interview"],
-  ["One of my proudest achievements was...","分享最自豪的成就","interview"],
-  ["I'm particularly passionate about...","表达对某领域的热情","interview"],
-  ["That's a great question. Let me think for a moment.","争取思考时间，礼貌回应","interview"],
-  ["Could you tell me more about the role?","了解岗位详情","interview"],
-  ["What does success look like in this position?","询问该职位的成功标准","interview"],
-  ["What are the biggest challenges the team is facing?","了解团队面临的挑战","interview"],
-  ["How would you describe the team culture here?","了解团队文化","interview"],
-  ["What does the onboarding process look like?","询问入职流程","interview"],
-  ["I'm very excited about this opportunity because...","表达对职位的兴趣与原因","interview"],
-  ["My greatest strength is...","描述最大优势","interview"],
-  ["One area I'm actively working to improve is...","回答弱点问题，展示成长意识","interview"],
-  ["I work best when...","描述最佳工作状态","interview"],
-  ["I tend to thrive in fast-paced environments.","擅长在快节奏环境下工作","interview"],
-  ["I'm a strong collaborator who also works well independently.","团队合作与独立工作兼顾","interview"],
-  ["I'd like to walk you through a specific example.","用具体案例回答问题（STAR法则引入）","interview"],
-  ["The situation was...","STAR法则：描述情境","interview"],
-  ["My task was to...","STAR法则：描述任务","interview"],
-  ["The action I took was...","STAR法则：描述行动","interview"],
-  ["As a result, we were able to...","STAR法则：描述结果","interview"],
-  ["I'm currently looking for a role that offers...","说明求职诉求","interview"],
-  ["My reason for leaving is that I'm looking for more growth opportunities.","解释离职原因","interview"],
-  ["I'm open to discussing the compensation package.","表示愿意商讨薪资","interview"],
-  ["Based on my research and experience, I'm looking for something in the range of...","给出薪资预期","interview"],
-  ["I have a competing offer, but this role is my first choice.","提及竞争offer，表达优先意向","interview"],
-  ["I'm very interested and would love to move forward.","表达强烈意愿推进下一步","interview"],
-  ["What's the timeline for the hiring process?","询问招聘时间线","interview"],
-  ["When might I expect to hear back?","询问何时收到回复","interview"],
-  ["Is there anything you'd like me to clarify or expand on?","主动询问是否需要补充","interview"],
-  ["Do you have any concerns about my candidacy?","主动了解面试官的顾虑","interview"],
-  ["I believe my background in X makes me a strong fit for this role.","强调背景与岗位匹配度","interview"],
-  ["I'm a quick learner and I've picked up new skills rapidly in past roles.","强调学习能力","interview"],
-  ["I thrive under pressure and consistently meet tight deadlines.","强调抗压与执行力","interview"],
-  ["I'm data-driven and always back my decisions with evidence.","强调数据导向的决策风格","interview"],
-  ["I bring a cross-functional perspective, having worked across X and Y teams.","强调跨部门视角","interview"],
-  ["I've led teams of up to X people.","描述管理经验","interview"],
-  ["I'm comfortable presenting to senior leadership.","展示向上汇报的能力","interview"],
-  ["I enjoy mentoring junior team members.","展示指导他人的意愿","interview"],
-  ["I've managed end-to-end projects from scoping to delivery.","展示项目全流程管理经验","interview"],
-  ["I'm familiar with tools like...","介绍熟悉的工具","interview"],
-  ["I've worked in both startup and corporate environments.","描述多元工作背景","interview"],
-  ["I was responsible for driving a X% improvement in...","用数据量化成就","interview"],
-  ["I spearheaded the initiative to...","描述主导推进某项目","interview"],
-  ["I collaborated closely with stakeholders to align on priorities.","描述利益相关方协作","interview"],
-  ["I would describe my management style as...","描述管理风格","interview"],
-  ["I give regular feedback and believe in transparency.","强调反馈文化","interview"],
-  ["I'm passionate about building inclusive teams.","表达对多元包容团队的重视","interview"],
-  ["Where do you see this role going in the next year or two?","了解职位未来发展","interview"],
-  ["What are the growth opportunities within the company?","了解公司内部晋升通道","interview"],
-  ["How does the company support professional development?","询问职业发展支持","interview"],
-  ["Is there anything about my background I can clarify?","主动给面试官提问机会","interview"],
-  ["Thank you so much for your time today.","面试结束致谢","interview"],
-  ["I really enjoyed learning more about the team and the role.","表达对面试内容的正面反馈","interview"],
-  ["I'm very enthusiastic about the direction the company is heading.","对公司方向表示认同","interview"],
-  ["I look forward to hearing from you.","期待后续消息","interview"],
-  ["I'll follow up with a thank-you note.","告知会发送感谢信","interview"],
-  ["Is it okay if I connect with you on LinkedIn?","询问是否可以在LinkedIn上联系","interview"],
-  ["I'm confident I can make a meaningful contribution here.","表达对贡献的信心","interview"],
+  ["Let\'s kick things off.","开场白，正式开始会议","Used to formally start a meeting","meeting"],
+  ["Just to set the agenda for today...","说明今日会议议程","Outlines the topics to be covered","meeting"],
+  ["Let\'s take this offline.","建议私下继续讨论","Suggest discussing a topic separately after the meeting","meeting"],
+  ["Circle back on this later.","此议题稍后再议","Defer a topic to revisit at a later point","meeting"],
+  ["Let\'s level-set before we dive in.","开始前先统一认知","Align everyone\'s understanding before starting","meeting"],
+  ["Can we table that for now?","暂时搁置这个话题","Pause discussion on a topic for now","meeting"],
+  ["Let\'s park that idea.","把这个想法先放一放","Set an idea aside to revisit later","meeting"],
+  ["Can everyone hear me okay?","远程会议确认音频","Check audio in remote meetings","meeting"],
+  ["I\'ll hand it over to Sarah.","将发言权交给他人","Pass the floor to another speaker","meeting"],
+  ["Does anyone have questions before we move on?","推进议程前询问是否有问题","Check for questions before advancing the agenda","meeting"],
+  ["Let me make sure I\'m capturing this correctly.","确认自己的理解和记录是否准确","Verify your understanding or notes are accurate","meeting"],
+  ["What\'s the action item here?","确认会议结论与行动项","Clarify the next steps or deliverables","meeting"],
+  ["Who\'s taking ownership of this?","确认负责人","Identify who is responsible for a task","meeting"],
+  ["Can we get a quick show of hands?","快速表决","Quick vote or poll in a meeting","meeting"],
+  ["Let\'s go around the room.","依次让每人发言","Have each person share their thoughts in turn","meeting"],
+  ["I\'d like to add something to that.","补充上一位发言人的内容","Build on what the previous speaker said","meeting"],
+  ["That resonates with me.","表示认同","Express agreement or strong connection with a point","meeting"],
+  ["Can you walk us through your thinking?","请对方解释思路","Ask someone to explain their reasoning","meeting"],
+  ["Let\'s make sure we\'re aligned on this.","确认团队对此达成一致","Ensure everyone is on the same page","meeting"],
+  ["I think we\'re getting off track.","提醒讨论跑题了","Redirect a discussion that has gone off topic","meeting"],
+  ["Let\'s bring it back to the main point.","把讨论拉回主题","Refocus the conversation","meeting"],
+  ["We\'re running low on time.","提醒时间不够了","Signal that the meeting is running over","meeting"],
+  ["Let\'s wrap up with key takeaways.","总结会议要点","Summarize the main points at the end","meeting"],
+  ["Can we schedule a follow-up?","建议安排后续会议","Propose a follow-up meeting","meeting"],
+  ["I\'ll send out the meeting notes afterward.","会后我来发会议纪要","Offer to distribute meeting minutes","meeting"],
+  ["Let me quickly recap what we\'ve discussed.","快速回顾讨论内容","Briefly summarize the discussion so far","meeting"],
+  ["Does that work for everyone?","确认方案是否对所有人都合适","Check if a proposal suits all parties","meeting"],
+  ["Any objections before we move forward?","推进前确认无异议","Check for objections before proceeding","meeting"],
+  ["Let\'s make this decision today.","推动当场拍板","Push for a decision in the current meeting","meeting"],
+  ["Can we set a deadline for this?","建议明确截止日期","Propose setting a clear due date","meeting"],
+  ["What are the blockers here?","询问阻碍因素","Ask what is preventing progress","meeting"],
+  ["What\'s the priority order?","询问优先级","Clarify which tasks should come first","meeting"],
+  ["Let\'s align on the timeline.","统一时间线","Agree on a shared schedule","meeting"],
+  ["I think we need to revisit our assumptions.","建议重新审视假设","Suggest re-examining the underlying assumptions","meeting"],
+  ["Can you give us a quick status update?","请对方简要更新进展","Ask for a brief progress report","meeting"],
+  ["Let\'s do a quick check-in.","简短进度确认","A brief sync to check on progress","meeting"],
+  ["I\'d like to build on what you said.","在对方发言基础上延伸","Extend or expand on someone else\'s point","meeting"],
+  ["That\'s a great segue into our next topic.","顺势引入下一议题","Transition smoothly to the next agenda item","meeting"],
+  ["Let\'s put this to a vote.","提议投票决定","Propose a vote to make a decision","meeting"],
+  ["Can we timebox this discussion?","建议限时讨论","Limit the time spent on a topic","meeting"],
+  ["I\'m going to stop sharing my screen.","停止屏幕共享","End screen sharing in a virtual meeting","meeting"],
+  ["Could you pull up the slides?","请对方切换到幻灯片","Ask someone to display the presentation","meeting"],
+  ["Let me share my screen.","开始共享屏幕","Start screen sharing in a virtual meeting","meeting"],
+  ["Sorry, I was on mute.","解释刚才静音了","Explain you were muted and couldn\'t be heard","meeting"],
+  ["You\'re breaking up a bit.","提醒对方网络不稳定","Inform someone their connection is unstable","meeting"],
+  ["Can you repeat that? There was some lag.","请对方重复，因为有延迟","Ask someone to repeat due to connection delay","meeting"],
+  ["Let\'s give it a moment for everyone to join.","等待其他人进入会议","Wait for latecomers before starting","meeting"],
+  ["We have a hard stop at 3pm.","强调会议必须在某时间结束","Emphasize the meeting must end at a fixed time","meeting"],
+  ["Let\'s use the last five minutes for open questions.","留出时间做自由提问","Reserve time at the end for open Q&A","meeting"],
+  ["I\'ll send a calendar invite for the follow-up.","告知会发送日历邀请","Offer to send a calendar invite for the next meeting","meeting"],
+  ["Before we close, any final thoughts?","结束前征集最后意见","Invite final comments before ending the meeting","meeting"],
+  ["Can we do a quick retrospective?","建议做简短复盘","Suggest a brief reflection on what went well","meeting"],
+  ["Let\'s be mindful of the time.","提醒注意时间","Gently remind everyone to watch the clock","meeting"],
+  ["I\'d love to get everyone\'s perspective on this.","征集所有人意见","Invite input from all participants","meeting"],
+  ["What\'s the biggest risk we\'re overlooking?","询问被忽视的最大风险","Surface hidden risks in the plan","meeting"],
+  ["Let\'s stress-test that assumption.","对某假设进行压力测试/挑战","Challenge an assumption to test its validity","meeting"],
+  ["Who are the key stakeholders we need to loop in?","确认需要知会的利益相关方","Identify people who should be informed","meeting"],
+  ["What does success look like for this initiative?","明确成功标准","Define what a successful outcome looks like","meeting"],
+  ["Let\'s document this decision.","记录这个决定","Record the decision that was made","meeting"],
+  ["Can we capture the rationale?","建议记录决策依据","Suggest documenting the reasoning behind a decision","meeting"],
+  ["I want to flag a dependency here.","提示某个依赖关系","Point out a task that depends on something else","meeting"],
+  ["This is a blocker for my team.","说明某事项是本团队的阻碍","Identify something preventing your team from progressing","meeting"],
+  ["Can we escalate this?","建议上报此问题","Suggest raising the issue to a higher level","meeting"],
+  ["Let\'s keep the momentum going.","保持推进势头","Encourage the team to maintain their pace","meeting"],
+  ["I\'ll take an action item on that.","我来负责跟进这一项","Volunteer to own a follow-up task","meeting"],
+  ["Can we assign owners before we leave?","散会前确认负责人","Make sure every task has an owner before ending","meeting"],
+  ["Let\'s not boil the ocean here.","不要把事情搞得过于复杂","Avoid over-complicating the problem","meeting"],
+  ["We need to be more concrete.","要求讨论更加具体","Ask for more specific and actionable discussion","meeting"],
+  ["Let\'s not get lost in the weeds.","不要纠结于细节","Avoid getting stuck on minor details","meeting"],
+  ["Let\'s zoom out for a second.","从宏观视角看问题","Step back and look at the big picture","meeting"],
+  ["Can we double-click on that?","建议深入讨论某点","Go deeper into a specific point","meeting"],
+  ["I want to make sure we\'re solving the right problem.","确认是否在解决正确问题","Check that the team is addressing the actual issue","meeting"],
+  ["Let\'s put a pin in that.","暂时标记此话题，稍后讨论","Note a topic to come back to later","meeting"],
+  ["Any dependencies we should flag?","有没有需要提示的依赖项","Check for any inter-team or task dependencies","meeting"],
+  ["What\'s the north star here?","询问核心目标是什么","Ask what the ultimate goal or guiding principle is","meeting"],
+  ["Let\'s pressure-test this plan.","对方案进行审查","Rigorously examine a plan for weaknesses","meeting"],
+  ["Is there anything blocking us from moving forward?","确认是否有阻碍推进的因素","Check for obstacles before proceeding","meeting"],
+  ["Let\'s do a quick sanity check.","做一个快速的合理性检验","Verify that something makes sense before proceeding","meeting"],
+  ["Hope this email finds you well.","邮件开场问候语","Standard polite opening for professional emails","email"],
+  ["I\'m reaching out regarding...","说明邮件目的","State the purpose of your email upfront","email"],
+  ["Following up on our conversation...","跟进此前的对话","Reference a previous discussion when following up","email"],
+  ["Please find attached...","提示附件","Alert the recipient to an attached file","email"],
+  ["As per my last email...","提醒对方查阅上封邮件","Refer the recipient back to your previous email","email"],
+  ["Just wanted to touch base.","礼貌地确认进展","A friendly check-in with no urgent agenda","email"],
+  ["Happy to jump on a call if that\'s easier.","建议改用电话/视频","Offer to switch to a call for complex matters","email"],
+  ["Could you loop in the relevant team?","请对方抄送相关团队","Ask the recipient to CC the appropriate team","email"],
+  ["I\'m CC\'ing Sarah for visibility.","抄送他人说明","Explain why you are copying someone else","email"],
+  ["Please let me know if you have any questions.","邮件结尾常用语","Standard email closing offering to help further","email"],
+  ["Looking forward to your reply.","期待回复","Express anticipation of a response","email"],
+  ["Let me know your availability.","询问对方时间","Ask when someone is free to meet or talk","email"],
+  ["I\'ll keep you posted.","告知会持续跟进","Promise to provide updates as things develop","email"],
+  ["Thanks for the heads-up.","感谢提前告知","Thank someone for informing you in advance","email"],
+  ["Apologies for the delayed response.","为延迟回复致歉","Acknowledge and apologise for a late reply","email"],
+  ["As discussed, please find the summary below.","如所讨论，摘要如下","Reference a prior discussion and share notes","email"],
+  ["Can you confirm receipt?","请对方确认已收到","Ask the recipient to acknowledge your email","email"],
+  ["Kind regards","邮件结尾礼貌用语","Formal yet warm email sign-off","email"],
+  ["Best,","简洁结尾用语","Concise and professional email closing","email"],
+  ["To whom it may concern,","不知收件人姓名时的开头","Opening when the recipient\'s name is unknown","email"],
+  ["I wanted to bring this to your attention.","希望引起对方注意","Politely flag something important","email"],
+  ["Please advise.","请对方给出建议或指示","Ask for guidance or a decision","email"],
+  ["Further to my previous email...","在上封邮件基础上补充","Add more information to a previous email","email"],
+  ["I\'ll circle back by end of week.","我本周末前跟进","Commit to following up before the week ends","email"],
+  ["Just a gentle reminder...","礼貌提醒","Politely remind someone about a pending task","email"],
+  ["As agreed...","如之前商定的","Reference a prior agreement","email"],
+  ["For your reference...","仅供参考","Share information without requiring action","email"],
+  ["Please revert at your earliest convenience.","请尽早回复","Ask for a response as soon as possible","email"],
+  ["I appreciate your patience.","感谢对方的耐心","Thank someone for waiting or being understanding","email"],
+  ["I hope you had a great weekend.","周一邮件开场白","Friendly opener for Monday emails","email"],
+  ["Thank you for your prompt response.","感谢对方的快速回复","Acknowledge and thank a quick reply","email"],
+  ["Could you please provide an update by Friday?","要求在某时间前更新进展","Request a status update by a specific date","email"],
+  ["I\'ll take it from here.","告知后续由我跟进","Let others know you will handle next steps","email"],
+  ["Please see the details inline.","指示回复内容在邮件内嵌","Direct the reader to inline notes in the email","email"],
+  ["Moving Sarah to BCC.","将某人移至密送","Explain moving someone to blind copy","email"],
+  ["Adding Tom to the thread for context.","将他人加入邮件串","Introduce a new person to an email chain","email"],
+  ["As a quick heads-up...","简短提前告知","Briefly flag something before it becomes an issue","email"],
+  ["Wanted to flag something quickly.","提示需要关注的事项","Raise a point that needs attention","email"],
+  ["I\'ll defer to your judgment on this.","此事我以对方决定为准","Express that you trust the other person\'s decision","email"],
+  ["Happy to discuss further if needed.","需要时可进一步讨论","Offer to elaborate in a follow-up conversation","email"],
+  ["Please note that...","请注意以下事项","Draw attention to an important point","email"],
+  ["I trust this answers your question.","相信这回答了你的问题","Politely close a response to a question","email"],
+  ["Do not hesitate to reach out.","鼓励对方随时联系","Encourage the recipient to contact you anytime","email"],
+  ["I\'d appreciate your input on this.","希望得到对方的意见","Ask for someone\'s opinion or feedback","email"],
+  ["Just a quick note to say...","简短说明某事","Introduce a brief message or update","email"],
+  ["This is time-sensitive.","此事较为紧急","Flag that a matter needs urgent attention","email"],
+  ["Can you take a look and share your thoughts?","请对方查阅并反馈","Ask someone to review and give feedback","email"],
+  ["I\'ve gone ahead and done X.","告知已提前完成某事","Inform someone you have already taken action","email"],
+  ["Let me know if this works for you.","确认方案是否合适","Check if a proposal or time slot suits the other person","email"],
+  ["Copying my manager for awareness.","抄送上级以便知悉","Explain why your manager is being CC\'d","email"],
+  ["Thank you for bringing this to my attention.","感谢对方提醒","Thank someone for flagging an issue","email"],
+  ["I\'ll need a bit more time on this.","告知需要更多时间","Let someone know you need extra time","email"],
+  ["Is Friday at 2pm workable?","建议具体会议时间","Propose a specific meeting time","email"],
+  ["Let me know if you need anything else.","邮件收尾，提供进一步支持","Offer further assistance at the end of an email","email"],
+  ["I\'ll follow up early next week.","下周初跟进","Commit to following up at the start of next week","email"],
+  ["I apologize for any confusion.","为造成困惑致歉","Apologise if your message was unclear","email"],
+  ["Can we connect briefly this week?","本周是否可以简短通话","Request a short call or meeting this week","email"],
+  ["Thanks for the context.","感谢提供背景信息","Thank someone for providing helpful background","email"],
+  ["I\'ll action this right away.","我马上处理这件事","Commit to handling something immediately","email"],
+  ["No action needed from your end.","无需对方采取任何行动","Clarify that the recipient does not need to do anything","email"],
+  ["I\'m flagging this for your awareness.","仅供知悉，无需行动","Share information without requiring a response","email"],
+  ["Happy to elaborate if needed.","需要时可进一步解释","Offer to provide more detail if required","email"],
+  ["Thank you for your continued support.","感谢持续的支持","Express gratitude for ongoing help","email"],
+  ["We\'ll keep you in the loop.","会持续知会对方","Promise to keep someone informed","email"],
+  ["I\'ll be out of office from Mon–Wed.","告知休假安排","Notify someone of your upcoming absence","email"],
+  ["For urgent matters, please contact Sarah.","告知紧急联系人","Provide an alternative contact for urgent issues","email"],
+  ["I\'ll pick this up when I\'m back.","回来后继续处理","Defer action until you return from leave","email"],
+  ["Thanks for looping me in.","感谢被纳入邮件抄送","Thank someone for including you on an email","email"],
+  ["Can we reconnect on this next week?","建议下周再跟进","Suggest picking up a conversation next week","email"],
+  ["That\'s a really solid piece of work.","称赞工作质量高","Praise the quality of someone\'s work","feedback"],
+  ["I appreciate your candid feedback.","感谢坦诚的反馈","Thank someone for honest feedback","feedback"],
+  ["Here\'s what\'s working well...","说明做得好的地方","Start with positive observations","feedback"],
+  ["Here\'s where I think there\'s room to grow.","指出可以改进的空间","Introduce areas for improvement constructively","feedback"],
+  ["I\'d love to see more initiative on your end.","希望对方表现出更多主动性","Encourage someone to take more proactive steps","feedback"],
+  ["The output was good, but the process needs work.","结果不错，但过程需要改进","Distinguish between the result and the approach","feedback"],
+  ["You\'re on the right track.","说明方向正确","Affirm that someone is heading in the right direction","feedback"],
+  ["I want to acknowledge the effort you put into this.","肯定对方付出的努力","Recognise the hard work behind the output","feedback"],
+  ["This exceeded my expectations.","超出了我的预期","Express that the work surpassed what was expected","feedback"],
+  ["This fell a bit short of what we were looking for.","没有完全达到预期","Gently note that the work didn\'t meet expectations","feedback"],
+  ["Next time, I\'d suggest...","下次建议...","Offer a constructive suggestion for improvement","feedback"],
+  ["Can I share some observations?","礼貌请求给出反馈","Ask permission before giving feedback","feedback"],
+  ["I noticed that...","提出观察到的问题","Introduce a specific observation","feedback"],
+  ["One area to watch is...","指出需要注意的方面","Flag something that needs monitoring","feedback"],
+  ["Your communication has really improved.","肯定沟通能力的提升","Acknowledge growth in communication skills","feedback"],
+  ["I think the analysis could go deeper.","分析可以更加深入","Suggest a more thorough analytical approach","feedback"],
+  ["The structure was clear and easy to follow.","称赞逻辑结构清晰","Compliment the organisation and clarity of work","feedback"],
+  ["The conclusion felt a bit rushed.","结论部分显得有些仓促","Note that the ending needed more development","feedback"],
+  ["You handled that situation really well.","肯定对方处理某情况的方式","Praise how someone managed a difficult situation","feedback"],
+  ["I\'d encourage you to speak up more in meetings.","鼓励对方在会议中更积极发言","Encourage someone to contribute more in meetings","feedback"],
+  ["Your attention to detail is impressive.","称赞细心认真","Compliment thoroughness and precision","feedback"],
+  ["I think there were some missed opportunities here.","指出未把握到的机会","Point out where more could have been done","feedback"],
+  ["Great job staying calm under pressure.","称赞在压力下保持冷静","Praise composure in a high-pressure situation","feedback"],
+  ["I\'d like to give you some constructive feedback.","要给出建设性反馈","Signal that feedback is about to be given","feedback"],
+  ["The delivery was great; the content needs refining.","表达方式很好，内容需要打磨","Separate delivery skills from content quality","feedback"],
+  ["You\'re a real asset to this team.","你是团队的重要财富","Express how valuable someone is to the team","feedback"],
+  ["I think you could delegate more effectively.","建议对方更有效地授权委托","Suggest improving delegation skills","feedback"],
+  ["This is exactly what we needed.","完全符合需求","Affirm that the work perfectly met the requirements","feedback"],
+  ["I\'d like to see this revisited.","建议重新审视","Request a revision or rethink","feedback"],
+  ["The timeline wasn\'t quite met.","未能按时完成","Note that a deadline was missed","feedback"],
+  ["Your energy in meetings is contagious.","称赞在会议中的积极感染力","Praise someone\'s positive presence in meetings","feedback"],
+  ["I think you need to manage up a bit more.","建议对方更好地向上管理","Encourage someone to communicate more with senior stakeholders","feedback"],
+  ["You\'re showing real leadership here.","展现出真正的领导力","Recognise genuine leadership qualities","feedback"],
+  ["I want to make sure we\'re setting you up for success.","确保为对方创造成功条件","Express commitment to the person\'s growth","feedback"],
+  ["What do you think went well?","请对方自我评估亮点","Invite self-reflection on successes","feedback"],
+  ["What would you do differently next time?","请对方反思改进点","Encourage reflection on areas for improvement","feedback"],
+  ["How are you feeling about your workload?","关心对方的工作量状态","Check in on someone\'s capacity and wellbeing","feedback"],
+  ["I want this to be a two-way conversation.","强调反馈是双向的","Signal that feedback should go both ways","feedback"],
+  ["Your growth this quarter has been remarkable.","肯定本季度明显的成长","Acknowledge significant progress over a period","feedback"],
+  ["I think you\'re ready for more responsibility.","认为对方已准备好承担更多责任","Express confidence in someone\'s readiness to grow","feedback"],
+  ["One piece of feedback I consistently hear is...","传递他人反复提到的反馈","Relay recurring feedback from others","feedback"],
+  ["I want to be direct with you.","直接切入主题","Signal that honest, frank feedback is coming","feedback"],
+  ["This isn\'t the standard we expect.","说明未达到预期标准","Clearly state that the work fell below expectations","feedback"],
+  ["I have high expectations of you because I believe in your potential.","解释高标准的原因是看好对方潜力","Frame high standards as a sign of belief in someone","feedback"],
+  ["Let\'s set some clear goals together.","一起制定明确目标","Propose co-creating measurable objectives","feedback"],
+  ["I need you to take more ownership.","要求对方更主动承担责任","Ask someone to be more accountable","feedback"],
+  ["You tend to over-explain in presentations.","指出汇报中有过度解释的倾向","Identify a pattern of unnecessary detail in presentations","feedback"],
+  ["You\'re great at the technical side; let\'s work on the narrative.","技术强，但需要提升叙事能力","Separate technical skills from storytelling ability","feedback"],
+  ["I want to acknowledge how much you\'ve grown.","肯定对方的成长","Recognise personal and professional development","feedback"],
+  ["This is the kind of work I love to see from you.","这正是我希望看到的你的工作状态","Express genuine enthusiasm for someone\'s output","feedback"],
+  ["I think you\'re underselling yourself.","指出对方低估了自己","Encourage someone to advocate for themselves more","feedback"],
+  ["Your instincts here were spot on.","称赞判断力准确","Affirm that someone\'s intuition was correct","feedback"],
+  ["Let\'s make sure this doesn\'t happen again.","确保类似情况不再发生","Address a recurring issue directly","feedback"],
+  ["I need you to be more proactive in flagging issues.","需要对方更主动地提出问题","Ask for earlier escalation of problems","feedback"],
+  ["Your stakeholder management has been excellent.","称赞利益相关方管理出色","Praise skills in managing relationships with stakeholders","feedback"],
+  ["This is a strong first draft.","称赞初稿质量","Acknowledge the quality of an initial version","feedback"],
+  ["There are a few areas that need tightening up.","有几个地方需要打磨收紧","Note that some parts need refinement","feedback"],
+  ["I\'m proud of how you handled that.","为对方的处理方式感到自豪","Express pride in how someone managed a situation","feedback"],
+  ["You\'ve really hit your stride.","称赞已进入最佳状态","Recognise that someone has found their rhythm","feedback"],
+  ["I see a real step change in your performance.","称赞表现有了质的飞跃","Acknowledge a significant improvement in performance","feedback"],
+  ["I\'d like to push back on that.","礼貌提出异议","Politely challenge a point or proposal","conflict"],
+  ["I see where you\'re coming from, but...","理解对方立场，但有不同意见","Acknowledge the other view before disagreeing","conflict"],
+  ["I have some concerns I\'d like to share.","表达顾虑","Introduce your reservations in a measured way","conflict"],
+  ["I think there might be a misunderstanding.","指出可能存在误解","Flag a possible communication gap","conflict"],
+  ["Let\'s find a middle ground.","寻求折中方案","Suggest a compromise position","conflict"],
+  ["I hear you, and I want to make sure we\'re on the same page.","确认双方理解一致","Acknowledge the other person while seeking alignment","conflict"],
+  ["With respect, I disagree.","礼貌表示不同意","Formally but respectfully express disagreement","conflict"],
+  ["Can I offer a different perspective?","提出不同视角","Ask permission to share an alternative viewpoint","conflict"],
+  ["I think we might be talking past each other.","指出沟通出现了偏差","Identify a communication breakdown","conflict"],
+  ["I want to address the elephant in the room.","正面处理大家都不说的问题","Bring up an uncomfortable but important issue","conflict"],
+  ["This doesn\'t sit right with me.","表达内心的不适或不认同","Express discomfort or disagreement with something","conflict"],
+  ["I have a different reading of the situation.","表达对情况的不同理解","Offer a contrasting interpretation","conflict"],
+  ["I\'m not sure I fully agree with that assessment.","委婉表示不完全认同","Politely signal partial disagreement","conflict"],
+  ["Can we revisit this decision?","建议重新审视某决定","Request a review of something already decided","conflict"],
+  ["I need to be transparent about my reservations.","表达保留意见","Openly share concerns about a plan or decision","conflict"],
+  ["I feel like my concerns aren\'t being heard.","表达感觉意见未被重视","Raise that your input has not been acknowledged","conflict"],
+  ["I want to flag a potential issue.","提示潜在问题","Alert others to a risk before it becomes a problem","conflict"],
+  ["I think we\'re moving too fast on this.","认为推进过于仓促","Suggest slowing down before proceeding","conflict"],
+  ["I\'m worried about the downstream impact.","担心后续影响","Raise concerns about second-order consequences","conflict"],
+  ["I\'d like us to pressure-test this assumption.","建议挑战某个假设","Challenge an assumption before committing","conflict"],
+  ["I want to make sure we\'ve considered all options.","确认已考虑所有选项","Ask whether alternatives have been properly explored","conflict"],
+  ["That approach carries some risk I want to highlight.","指出某方法的风险","Call attention to risks in a proposed approach","conflict"],
+  ["I don\'t think this is the right call.","认为这个决定是错误的","Express that you believe a decision is wrong","conflict"],
+  ["I feel strongly about this.","表达坚定立场","Signal that you hold a firm position","conflict"],
+  ["I\'d like to understand the reasoning better.","请对方解释原因","Ask for a fuller explanation of the rationale","conflict"],
+  ["I think we need more data before we decide.","建议在更多数据支持下再决定","Argue for gathering more evidence first","conflict"],
+  ["I want to be clear about where I stand.","明确表达自己的立场","State your position explicitly","conflict"],
+  ["Can we agree to disagree on this one?","建议在此问题上各自保留意见","Propose accepting different views without resolution","conflict"],
+  ["I appreciate you raising that, but my view is different.","感谢对方提出，但表达不同意见","Acknowledge a point before sharing a different view","conflict"],
+  ["I think we need a mediator here.","建议引入中立方调解","Suggest bringing in a neutral third party","conflict"],
+  ["I want to resolve this constructively.","希望建设性地解决问题","Express intention to find a positive solution","conflict"],
+  ["I\'m open to being convinced, but I\'m not there yet.","开放态度，但尚未被说服","Show openness while holding your current position","conflict"],
+  ["Let\'s separate the issue from the person.","区分问题与个人","Keep discussion professional and objective","conflict"],
+  ["I don\'t want this to become adversarial.","不希望演变成对立关系","Signal a desire to keep the conversation collaborative","conflict"],
+  ["I think we can both win here.","强调可以找到双赢方案","Reframe the conversation around mutual benefit","conflict"],
+  ["Can we take the emotion out of this?","建议理性讨论","Suggest focusing on facts rather than feelings","conflict"],
+  ["I want to understand your priorities.","了解对方的优先考量","Seek to understand what matters most to the other side","conflict"],
+  ["I\'m not trying to be difficult.","说明自己并非故意刁难","Clarify that your pushback is constructive","conflict"],
+  ["I just want to make sure we\'ve thought this through.","确保经过深思熟虑","Advocate for more thorough consideration","conflict"],
+  ["I have a different set of constraints.","说明自己有不同的限制条件","Explain that your circumstances differ","conflict"],
+  ["I think the data tells a different story.","用数据提出不同结论","Use evidence to challenge a claim","conflict"],
+  ["That\'s not aligned with our team\'s goals.","指出与团队目标不符","Note that something conflicts with your team\'s objectives","conflict"],
+  ["I\'m going to need more time to think about this.","表示需要更多时间考虑","Ask for time before committing to a decision","conflict"],
+  ["I want to make sure we don\'t regret this decision.","确保不会后悔这个决定","Push for more careful consideration before deciding","conflict"],
+  ["I\'d prefer a more collaborative approach.","表达希望更具协作性的方式","Advocate for a more inclusive process","conflict"],
+  ["I\'m not comfortable with this direction.","表达对该方向感到不安","Express discomfort with a proposed course of action","conflict"],
+  ["I don\'t think that\'s a fair characterization.","认为对方的描述不够准确","Dispute how a situation has been framed","conflict"],
+  ["I want to address this head-on.","直接面对和处理问题","Signal intention to tackle an issue directly","conflict"],
+  ["I think there\'s a better way to handle this.","认为有更好的处理方式","Suggest an alternative approach","conflict"],
+  ["Let\'s focus on solutions, not blame.","聚焦解决方案而非责任追究","Redirect the conversation away from blame","conflict"],
+  ["I\'d like to understand the full picture before responding.","希望了解全貌再作回应","Ask for complete context before replying","conflict"],
+  ["I hear your frustration.","表达对对方挫败感的理解","Acknowledge the other person\'s emotional state","conflict"],
+  ["I want us to come out of this stronger.","希望经此更加团结","Express a constructive intent to strengthen the relationship","conflict"],
+  ["Can we reset and start fresh?","建议重新开始讨论","Propose starting the conversation over","conflict"],
+  ["I think we owe each other more clarity here.","双方都需要更清晰的沟通","Call for better communication on both sides","conflict"],
+  ["Today I\'ll be walking you through...","介绍汇报内容","Introduce the structure of your presentation","present"],
+  ["Let me give you a quick overview.","提供简要概述","Provide a brief summary before diving into details","present"],
+  ["The key takeaway here is...","指出核心结论","Highlight the most important point","present"],
+  ["Let\'s look at the data.","切换到数据","Direct attention to data or evidence","present"],
+  ["As you can see from this slide...","引导听众关注幻灯片内容","Guide the audience\'s attention to a specific slide","present"],
+  ["I\'ll dive into the details in a moment.","告知稍后深入讲解","Signal that more detail is coming","present"],
+  ["To put this in context...","提供背景信息","Provide background before presenting information","present"],
+  ["Here\'s what this means for us.","说明对团队/公司的含义","Explain the implications of the data","present"],
+  ["Let me highlight three points.","强调三个要点","Introduce a structured set of key points","present"],
+  ["This is the problem we\'re solving.","阐明正在解决的问题","Clearly define the problem at the start","present"],
+  ["Here\'s our proposed solution.","提出解决方案","Present your recommended approach","present"],
+  ["The numbers speak for themselves.","数据不言而喻","Let strong data make the case without extra explanation","present"],
+  ["Let me put this in perspective.","帮助听众正确理解数据规模","Help the audience understand the scale or significance","present"],
+  ["Here\'s the before and after.","展示对比效果","Show a comparison to illustrate improvement","present"],
+  ["Let\'s zoom in on this chart.","放大查看图表","Direct attention to a specific part of a visual","present"],
+  ["I want to call out something important.","指出重要之处","Flag a critical point that deserves attention","present"],
+  ["Here\'s the bottom line.","说明最终结论","Summarise the most important conclusion","present"],
+  ["The headline number is...","给出最关键的数字","Lead with the most impactful figure","present"],
+  ["We exceeded our target by X%.","超额完成目标","Report that performance surpassed the goal","present"],
+  ["We fell short of our target.","未达目标","Honestly report underperformance","present"],
+  ["Here\'s our recommendation.","提出建议","Present your advised course of action","present"],
+  ["There are three options on the table.","列出三个备选方案","Introduce a set of alternatives","present"],
+  ["Our preferred path forward is...","我们倾向的推进方式","State the option you are recommending","present"],
+  ["The risks are manageable.","风险是可控的","Reassure the audience that risks have been considered","present"],
+  ["Here\'s the investment required.","说明所需投入","Present the resources or budget needed","present"],
+  ["The ROI looks compelling.","投资回报率具有吸引力","Highlight a strong return on investment","present"],
+  ["We\'re asking for your approval to proceed.","请求批准推进","Formally request sign-off from the audience","present"],
+  ["Any questions so far?","中途询问是否有问题","Check for questions mid-presentation","present"],
+  ["I\'ll take questions at the end.","告知提问环节在最后","Set expectations for when Q&A will happen","present"],
+  ["Let me pause here for reactions.","在此暂停，听取反馈","Invite immediate feedback at a key moment","present"],
+  ["I want to be upfront about the challenges.","坦诚说明面临的挑战","Address difficulties honestly before being asked","present"],
+  ["This is a work in progress.","说明仍在进行中","Clarify that what you\'re showing is not final","present"],
+  ["We\'re seeking feedback at this stage.","当前阶段征求意见","Make clear that input is welcomed at this point","present"],
+  ["Here\'s where we need your input.","需要对方在此给出意见","Identify a specific point where you want the audience\'s help","present"],
+  ["Let me summarize.","做总结","Signal that you are wrapping up","present"],
+  ["To recap the key points...","回顾要点","Revisit the most important points before closing","present"],
+  ["Our next steps are...","说明后续行动","Outline what will happen after the presentation","present"],
+  ["We\'ll reconvene in four weeks.","告知下次跟进时间","Communicate when the next check-in will be","present"],
+  ["I\'ll send out the deck afterward.","会后发送演示文稿","Offer to share the slides after the meeting","present"],
+  ["Thank you for your time and attention.","感谢听众","Close the presentation with gratitude","present"],
+  ["I\'m happy to take any questions.","开放提问","Open the floor for questions","present"],
+  ["That\'s a great question.","正面回应提问","Acknowledge a question positively before answering","present"],
+  ["I want to make sure I answer that fully.","确保全面回答问题","Signal that you will give a thorough answer","present"],
+  ["Let me come back to that.","稍后回答该问题","Defer a question to address it later","present"],
+  ["I don\'t have that data on hand, but I\'ll follow up.","当前没有该数据，但会后跟进","Honestly defer and commit to following up","present"],
+  ["This slide tells a story.","说明该幻灯片有内在逻辑","Frame a slide as a narrative arc","present"],
+  ["The trend is encouraging.","趋势令人鼓舞","Highlight positive momentum in the data","present"],
+  ["The trend is concerning.","趋势令人担忧","Flag a worrying pattern in the data","present"],
+  ["We attribute this to...","将此归因于...","Explain the cause of a result","present"],
+  ["This is a leading indicator.","这是一个领先指标","Identify a metric that predicts future performance","present"],
+  ["The year-over-year growth is...","同比增长为...","Report growth compared to the same period last year","present"],
+  ["Benchmarked against the industry...","与行业基准比较","Compare your performance to industry standards","present"],
+  ["We outperformed our competitors.","超越了竞争对手","Report that you beat the competition","present"],
+  ["Here\'s the risk matrix.","展示风险矩阵","Present a visual overview of risks","present"],
+  ["We\'ve stress-tested the model.","对模型进行了压力测试","Demonstrate that your model has been rigorously tested","present"],
+  ["The assumptions underpinning this are...","支撑此结论的假设是...","Be transparent about the assumptions in your analysis","present"],
+  ["This is a conservative estimate.","这是一个保守估计","Flag that your projection is on the cautious side","present"],
+  ["We see significant upside here.","此处有显著的上行空间","Highlight strong potential for growth","present"],
+  ["Let me hand over to my colleague.","将汇报交给同事继续","Transition the presentation to another speaker","present"],
+  ["I\'ll be taking you through sections one and two.","说明自己负责的部分","Clarify which parts of the presentation you are covering","present"],
+  ["What are your key priorities here?","了解对方最重要的诉求","Understand what matters most to the other party","negotiate"],
+  ["Here\'s what I can offer.","说明可以提供的条件","Introduce what you are prepared to give","negotiate"],
+  ["What would it take to make this work?","询问达成协议的条件","Ask what is needed to reach an agreement","negotiate"],
+  ["We\'re flexible on X if you can move on Y.","就某项提出互换条件","Propose a trade-off between two variables","negotiate"],
+  ["That\'s outside our budget.","表示超出预算","Indicate that a figure exceeds your financial limit","negotiate"],
+  ["Can we explore a phased approach?","建议分阶段推进","Suggest breaking the deal into stages","negotiate"],
+  ["Is there any room to move on price?","询问价格是否有弹性","Ask if the price has any flexibility","negotiate"],
+  ["I need to take this back to my team.","需要与团队商讨","Signal that you need internal approval before committing","negotiate"],
+  ["We\'re committed to making this partnership work.","强调对合作的承诺","Reinforce your dedication to the relationship","negotiate"],
+  ["What\'s the best you can do?","询问对方最优条件","Push for the other party\'s best offer","negotiate"],
+  ["I think we\'re close to a deal.","表示即将达成协议","Signal that agreement is within reach","negotiate"],
+  ["Can we agree on a trial period?","建议试行期","Propose testing the arrangement before full commitment","negotiate"],
+  ["Let\'s put the headline terms on paper.","建议先把主要条款落实到纸面","Suggest formalising the key terms in writing","negotiate"],
+  ["I\'d like to build in some flexibility.","希望保留一些弹性空间","Ask for room to adapt the terms later","negotiate"],
+  ["That\'s a firm number for us.","说明某数字是硬性条件","State that a figure is non-negotiable for you","negotiate"],
+  ["What\'s the value you\'re seeing here?","询问对方看到的价值","Ask the other party to articulate the value they see","negotiate"],
+  ["Can we find a creative solution?","建议寻找创新解决方案","Invite lateral thinking to break a deadlock","negotiate"],
+  ["I want to make sure both sides win.","强调追求双赢","Frame the negotiation as a mutual-benefit exercise","negotiate"],
+  ["We\'d be open to a longer-term commitment for a better rate.","提出以长期承诺换取更优惠价格","Trade a longer contract for a lower price","negotiate"],
+  ["What\'s non-negotiable for you?","询问对方的底线","Identify the other party\'s hard limits","negotiate"],
+  ["We can work with that.","表示可以接受对方条件","Accept or accommodate the other party\'s offer","negotiate"],
+  ["That\'s a tough ask.","承认对方要求很高","Acknowledge that a request is demanding","negotiate"],
+  ["Let me see what I can do.","表示会尽力争取","Signal willingness to explore possibilities","negotiate"],
+  ["We\'d need something in return.","提出需要相应回报","Make clear that a concession requires reciprocation","negotiate"],
+  ["Can we revisit the scope instead?","建议调整范围而非价格","Propose changing the deliverables rather than the price","negotiate"],
+  ["I think there\'s value in moving quickly.","强调尽快推进的价值","Make the case for closing the deal soon","negotiate"],
+  ["Let\'s agree on the key points first.","建议先就核心条款达成一致","Prioritise agreement on the most important terms","negotiate"],
+  ["Is there anything stopping you from signing today?","询问是否有阻碍当场签约的因素","Identify and address final objections","negotiate"],
+  ["We have some flexibility on the timeline.","时间线上有一定弹性","Offer scheduling flexibility as a concession","negotiate"],
+  ["Can we structure this as a pilot?","建议以试点形式推进","Propose a trial run before full commitment","negotiate"],
+  ["What would help you feel confident?","询问如何让对方更有信心","Ask what would increase the other party\'s certainty","negotiate"],
+  ["I understand your constraints.","表示理解对方的限制","Show empathy for the other party\'s limitations","negotiate"],
+  ["Can we split the difference?","建议各退一步","Propose meeting halfway on a disputed figure","negotiate"],
+  ["That works if we can also have...","接受条件，附加提出其他要求","Accept a condition while adding a counter-request","negotiate"],
+  ["We\'re prepared to move quickly.","表示可以快速推进","Signal readiness to close fast","negotiate"],
+  ["What does your decision-making process look like?","了解对方的决策流程","Understand the steps needed before they can commit","negotiate"],
+  ["Who else is involved in this decision?","了解其他决策参与者","Identify other stakeholders in the process","negotiate"],
+  ["I\'d like to propose something slightly different.","提出不同方案","Introduce an alternative proposal","negotiate"],
+  ["Let me put a proposal together.","表示会整理一份方案","Offer to formalise your offer in a document","negotiate"],
+  ["We\'re aligned on the goal; it\'s the terms we need to work through.","目标一致，需要商讨的是条款","Clarify that agreement on the goal exists but details remain","negotiate"],
+  ["I think we can get there.","相信可以达成协议","Express optimism that a deal is achievable","negotiate"],
+  ["This is a significant investment for us.","强调这对我们是重大投入","Contextualise the size of your commitment","negotiate"],
+  ["What\'s the cost of not doing this?","分析不行动的代价","Reframe the decision around the risks of inaction","negotiate"],
+  ["We\'ve done our homework on this.","表明已做过充分调研","Signal that your position is well-researched","negotiate"],
+  ["Let\'s get something drafted.","建议起草方案","Move toward a written agreement","negotiate"],
+  ["I\'d like to revisit the payment terms.","提出重新讨论付款条件","Raise the topic of when and how payment will be made","negotiate"],
+  ["Can we agree on a 30-day review clause?","建议加入30天审查条款","Propose a built-in review point in the agreement","negotiate"],
+  ["I want to be transparent about our position.","坦诚说明己方立场","Share your constraints and priorities openly","negotiate"],
+  ["We\'re not in a position to go below that.","表示无法低于该底线","State your floor clearly","negotiate"],
+  ["I think that\'s a fair ask.","认为这个要求合理","Acknowledge that a request is reasonable","negotiate"],
+  ["Let me check with my stakeholders.","告知需要与相关方确认","Defer while you consult internally","negotiate"],
+  ["We\'d be willing to sweeten the deal with...","表示愿意在某项上让步","Offer an additional incentive to close","negotiate"],
+  ["Let\'s shake on it.","表示达成协议","Signal that a deal has been reached","negotiate"],
+  ["I\'ll have the contract drawn up.","告知将安排起草合同","Commit to formalising the agreement","negotiate"],
+  ["Looking forward to working together.","表达对合作的期待","Close negotiations with a positive, forward-looking tone","negotiate"],
+  ["Can everyone see my screen?","确认屏幕共享是否正常","Check that screen sharing is working for all participants","remote"],
+  ["You\'re on mute.","提醒对方已静音","Inform someone they are muted","remote"],
+  ["I think you\'re on mute — we can\'t hear you.","提醒对方无法听到其声音","Let someone know their audio is off","remote"],
+  ["Sorry, I had connectivity issues.","解释网络问题","Apologise for technical difficulties","remote"],
+  ["Can you drop the link in the chat?","请对方在聊天框贴链接","Ask someone to share a link in the chat","remote"],
+  ["I\'ll share my screen now.","告知开始共享屏幕","Announce that you are starting screen share","remote"],
+  ["Let\'s use the whiteboard.","建议使用白板协作","Propose collaborative whiteboarding","remote"],
+  ["Can you see the document I shared?","确认文件共享是否正常","Check that a shared document is visible to others","remote"],
+  ["I\'ll drop the notes in Slack.","告知会在Slack发送记录","Commit to posting meeting notes in a messaging tool","remote"],
+  ["Let\'s keep this async.","建议异步沟通","Propose handling a matter without a live meeting","remote"],
+  ["I\'ll record this for those who can\'t join.","告知会录制会议","Offer to record for absent participants","remote"],
+  ["Is the recording on?","确认是否在录制","Check whether the meeting is being recorded","remote"],
+  ["Let\'s do a quick round of intros for those joining remotely.","为远程参会者做自我介绍","Introduce participants to those joining virtually","remote"],
+  ["Can you bump up the font size on your screen?","请对方放大字体","Ask someone to increase text size for visibility","remote"],
+  ["Sorry for the background noise.","为背景噪音道歉","Apologise for audio disruptions","remote"],
+  ["I\'ll be joining from a different time zone.","告知不同时区参会","Inform others you are in a different time zone","remote"],
+  ["What time is that in your timezone?","询问对方时区的时间","Clarify a meeting time across time zones","remote"],
+  ["Can we find a time that works for everyone?","协调各方都方便的时间","Coordinate a meeting time across different schedules","remote"],
+  ["I\'ll send a Loom instead of scheduling a meeting.","用录制视频代替会议","Propose sending a recorded video instead of meeting","remote"],
+  ["Let\'s keep this in writing for clarity.","建议书面记录以保证清晰","Suggest documenting decisions to avoid confusion","remote"],
+  ["I\'ll update the shared doc.","告知会更新共享文档","Commit to updating a collaborative document","remote"],
+  ["Can you assign that to me in Asana/Jira?","请对方在任务工具中分配任务","Ask to be assigned a task in a project management tool","remote"],
+  ["Let\'s sync up on a quick call.","建议简短通话同步","Propose a brief call to align","remote"],
+  ["I\'ll ping you on Slack.","告知会在Slack联系","Let someone know you will message them","remote"],
+  ["Feel free to comment directly on the doc.","邀请直接在文档上评论","Invite others to leave comments in a shared document","remote"],
+  ["I\'ve added comments inline.","告知已添加行内评论","Let others know you have annotated a document","remote"],
+  ["Let\'s use the reaction emojis to vote.","用表情反应来投票","Propose using emoji reactions to gather quick consensus","remote"],
+  ["I\'ll set up a shared Notion page.","告知会建立共享页面","Offer to create a shared workspace or page","remote"],
+  ["Can you check the calendar invite for the details?","请对方查看日历邀请获取详情","Direct someone to a calendar event for information","remote"],
+  ["The agenda is in the invite.","议程在日历邀请中","Let attendees know where to find the agenda","remote"],
+  ["Let\'s do a written check-in this week instead of a call.","本周用书面更新代替通话","Propose an async status update instead of a meeting","remote"],
+  ["I\'ll be heads-down for the next few hours.","告知接下来几小时专注工作","Signal that you will be unavailable and focused","remote"],
+  ["My status will be on Do Not Disturb.","告知已设置勿扰状态","Inform others you have set a DND status","remote"],
+  ["Feel free to async this in Slack if it\'s not urgent.","非紧急事项请发Slack异步处理","Redirect non-urgent messages to async channels","remote"],
+  ["I\'ll share the recording link afterward.","会后发送录制链接","Offer to send the meeting recording after it ends","remote"],
+  ["Can you add timestamps to the recording?","请对方为录制添加时间戳","Ask for chapter markers to be added to a recording","remote"],
+  ["Let\'s create a shared action item list.","建立共享行动项列表","Set up a shared place to track follow-up tasks","remote"],
+  ["I\'ve updated the project board.","告知已更新项目看板","Inform others that task statuses have been updated","remote"],
+  ["Can we move this to a Slack thread?","建议在Slack线程中继续讨论","Suggest continuing a discussion in a thread","remote"],
+  ["Let\'s keep all updates in one place.","建议集中管理所有更新","Propose consolidating communications in a single channel","remote"],
+  ["I\'ll get back to you on that.","稍后回复对方","Defer answering until you have more information","general"],
+  ["Let me look into this.","我去了解一下","Commit to investigating something","general"],
+  ["Can you give me the full picture?","请对方提供完整信息","Ask for complete context on a situation","general"],
+  ["What\'s the best way to approach this?","询问最佳处理方式","Ask for advice on how to handle something","general"],
+  ["Let\'s be strategic about this.","建议战略性地处理","Encourage a considered, long-term approach","general"],
+  ["What\'s the end goal here?","明确最终目标","Clarify the ultimate objective","general"],
+  ["I want to make sure we\'re solving the right problem.","确认解决的是正确问题","Check that the team is addressing the actual issue","general"],
+  ["Let\'s not reinvent the wheel.","不要重复造轮子","Avoid duplicating existing solutions","general"],
+  ["What\'s the MVP here?","询问最小可行方案","Ask for the minimum viable version of something","general"],
+  ["Let\'s move the needle on this.","推动取得实质进展","Make meaningful progress on something","general"],
+  ["We need to be more data-driven.","需要更多依据数据决策","Advocate for evidence-based decision making","general"],
+  ["Let\'s keep it simple.","保持简单","Advocate for simplicity","general"],
+  ["What are the trade-offs?","有哪些权衡取舍","Ask about the pros and cons of different options","general"],
+  ["Let\'s weigh the pros and cons.","权衡利弊","Evaluate the advantages and disadvantages","general"],
+  ["What\'s the opportunity cost?","机会成本是什么","Ask what is being given up by choosing one option","general"],
+  ["Let\'s build a business case.","建议撰写商业案例","Propose creating a formal justification for a project","general"],
+  ["Who are the key decision-makers?","谁是关键决策者","Identify who has authority to approve","general"],
+  ["We need executive buy-in.","需要高层的支持","Secure approval and support from senior leadership","general"],
+  ["Let\'s get cross-functional alignment.","需要跨部门对齐","Ensure different teams are aligned","general"],
+  ["I\'ll need to loop in Legal.","需要知会法务部门","Involve the legal team in the discussion","general"],
+  ["This needs sign-off from Finance.","需要财务部门批准","Obtain approval from the finance team","general"],
+  ["Let\'s make sure compliance is happy.","确保合规部门没有异议","Ensure the compliance team has no objections","general"],
+  ["What\'s our runway on this?","我们还有多少时间/资源","Ask how much time or resource is available","general"],
+  ["We\'re resource-constrained right now.","目前资源有限","Acknowledge that capacity is limited","general"],
+  ["Let\'s be realistic about scope.","对范围保持现实","Avoid over-promising on deliverables","general"],
+  ["We need to manage expectations.","需要管理预期","Ensure stakeholders have realistic expectations","general"],
+  ["What\'s the impact vs. effort ratio?","影响力与投入的比例如何","Evaluate whether the return justifies the effort","general"],
+  ["Let\'s prioritize ruthlessly.","要无情地排列优先级","Make hard decisions about what to focus on","general"],
+  ["What\'s in scope vs. out of scope?","什么在范围内，什么在范围外","Define the boundaries of a project","general"],
+  ["Let\'s define success metrics upfront.","提前定义成功指标","Agree on how success will be measured","general"],
+  ["We need to be more agile.","需要更敏捷","Advocate for a faster, iterative approach","general"],
+  ["Let\'s do a post-mortem.","做事后复盘","Review what happened after a project or incident","general"],
+  ["What\'s the root cause?","根本原因是什么","Identify the underlying cause of a problem","general"],
+  ["We need to mitigate this risk.","需要降低这个风险","Take action to reduce a known risk","general"],
+  ["Let\'s build in a contingency.","建议留出应急预案","Add a buffer or backup plan","general"],
+  ["What\'s plan B?","B计划是什么","Ask for an alternative if the primary plan fails","general"],
+  ["We\'re in good shape on this.","这一项进展良好","Signal that progress is on track","general"],
+  ["We\'re at risk of missing the deadline.","有错过截止日期的风险","Flag that a deadline may be missed","general"],
+  ["I\'ll escalate this if needed.","必要时我会上报","Signal readiness to raise the issue higher","general"],
+  ["This is a quick win.","这是一个容易实现的成果","Identify something that can deliver value fast","general"],
+  ["Let\'s celebrate this win.","庆祝这个成果","Acknowledge and recognise a team success","general"],
+  ["This is a learning moment.","这是一个学习的机会","Reframe a setback as an opportunity to grow","general"],
+  ["Let\'s fail fast and iterate.","快速试错，快速迭代","Embrace rapid experimentation and learning","general"],
+  ["We need to ship this.","需要发布上线","Push for delivery and launch","general"],
+  ["What\'s blocking us?","是什么在阻碍我们","Ask what is preventing progress","general"],
+  ["Let\'s clear the backlog.","清理积压任务","Address outstanding tasks","general"],
+  ["What\'s the latest on this?","最新进展如何","Ask for a current status update","general"],
+  ["Can you give me a quick update?","简要更新一下进展","Request a brief progress report","general"],
+  ["We\'re on track.","进展顺利，在计划内","Report that things are going as planned","general"],
+  ["We\'re slightly behind but recovering.","略有落后，但正在追赶","Acknowledge a delay while signalling recovery","general"],
+  ["I appreciate your flexibility.","感谢对方的灵活配合","Thank someone for being adaptable","general"],
+  ["Thank you for your patience.","感谢对方的耐心","Thank someone for waiting or being understanding","general"],
+  ["I\'ll own this.","我来负责这件事","Take personal accountability for something","general"],
+  ["That\'s on me.","这是我的责任","Accept personal responsibility for a mistake","general"],
+  ["I\'ll make it right.","我会弥补这个问题","Commit to correcting an error","general"],
+  ["Let\'s not point fingers.","不要互相指责","Discourage blame and encourage accountability","general"],
+  ["Let\'s focus on solutions.","专注于解决方案","Redirect energy toward fixing the problem","general"],
+  ["I\'m confident we can figure this out.","相信我们能解决","Express belief in the team\'s ability to solve a problem","general"],
+  ["Let\'s think outside the box.","换个思路想想","Encourage creative thinking","general"],
+  ["That\'s a great insight.","这是很棒的洞察","Acknowledge a valuable observation","general"],
+  ["I hadn\'t thought of it that way.","我没从那个角度想过","Express genuine appreciation for a new perspective","general"],
+  ["Let\'s sanity-check that.","做一个合理性检验","Quickly verify that something makes sense","general"],
+  ["Does this pass the smell test?","这经得起推敲吗","Informally check whether something seems right","general"],
+  ["Let\'s gut-check this decision.","直觉上检验一下这个决定","Check whether a decision feels right intuitively","general"],
+  ["I think we\'re overthinking this.","我觉得我们想太多了","Suggest keeping things simpler","general"],
+  ["Let\'s keep the big picture in mind.","要时刻记住大局","Remind the team to stay focused on overarching goals","general"],
+  ["How does this ladder up to our goals?","这如何支撑我们的整体目标","Ask how something connects to broader objectives","general"],
+  ["This isn\'t strategic enough.","这还不够具有战略性","Flag that a plan lacks strategic thinking","general"],
+  ["Let\'s make this scalable.","确保这是可扩展的","Design solutions that can grow with demand","general"],
+  ["We need a sustainable solution.","需要可持续的解决方案","Advocate for long-term thinking","general"],
+  ["This is a band-aid fix.","这只是权宜之计","Note that a solution only addresses symptoms not causes","general"],
+  ["We need to fix the root issue.","需要解决根本问题","Push for addressing the underlying cause","general"],
+  ["Great minds think alike!","英雄所见略同","Humorous expression when two people have the same idea","general"],
+  ["I\'m fully aligned with that.","我完全赞同","Express complete agreement","general"],
+  ["You took the words right out of my mouth.","你说出了我想说的话","Express that someone voiced exactly what you were thinking","general"],
+  ["That\'s exactly where I was going.","这正是我想说的方向","Confirm that someone is on the same track as you","general"],
+  ["I\'ll defer to your expertise here.","此处我以你的专业判断为准","Acknowledge someone\'s superior knowledge in an area","general"],
+  ["I trust your judgment.","我相信你的判断","Express confidence in someone\'s decision-making","general"],
+  ["Can I get your two cents?","能听听你的看法吗","Ask for someone\'s informal opinion","general"],
+  ["Happy to brainstorm together.","乐意一起头脑风暴","Offer to think through ideas collaboratively","general"],
+  ["Let\'s ideate on this.","就此展开创意讨论","Invite open-ended creative thinking","general"],
+  ["What\'s your gut feeling?","你的直觉是什么","Ask for an instinctive or informal opinion","general"],
+  ["I want to be upfront about this.","我想直接说明这件事","Signal transparent and honest communication","general"],
+  ["Let\'s set some ground rules.","制定一些基本规则","Establish shared expectations for a process","general"],
+  ["I\'ll hold you to that.","我会记住你说的","Playfully note that you will remember a commitment","general"],
+  ["You can count on me.","你可以依靠我","Express reliability and commitment","general"],
+  ["Tell me about yourself.","请介绍一下你自己（经典开场问题）","Classic opening question in job interviews","interview"],
+  ["I\'d describe myself as someone who...","自我介绍时描述自己的特质","Introduce your personal qualities and work style","interview"],
+  ["I\'ve spent the past X years working in...","介绍过去的工作经历","Summarise your professional background","interview"],
+  ["One of my proudest achievements was...","分享最自豪的成就","Highlight a standout accomplishment","interview"],
+  ["I\'m particularly passionate about...","表达对某领域的热情","Share what drives or motivates you professionally","interview"],
+  ["That\'s a great question. Let me think for a moment.","争取思考时间，礼貌回应","Buy time to think before answering a tough question","interview"],
+  ["Could you tell me more about the role?","了解岗位详情","Ask for more information about the position","interview"],
+  ["What does success look like in this position?","询问该职位的成功标准","Clarify how performance will be evaluated","interview"],
+  ["What are the biggest challenges the team is facing?","了解团队面临的挑战","Show strategic thinking by asking about real problems","interview"],
+  ["How would you describe the team culture here?","了解团队文化","Ask about working environment and team dynamics","interview"],
+  ["What does the onboarding process look like?","询问入职流程","Show forward-thinking by asking about your start","interview"],
+  ["I\'m very excited about this opportunity because...","表达对职位的兴趣与原因","Articulate genuine enthusiasm for the role","interview"],
+  ["My greatest strength is...","描述最大优势","Answer the classic strengths question","interview"],
+  ["One area I\'m actively working to improve is...","回答弱点问题，展示成长意识","Answer the weakness question with a growth mindset","interview"],
+  ["I work best when...","描述最佳工作状态","Describe your preferred working conditions","interview"],
+  ["I tend to thrive in fast-paced environments.","擅长在快节奏环境下工作","Signal adaptability and energy","interview"],
+  ["I\'m a strong collaborator who also works well independently.","团队合作与独立工作兼顾","Show versatility in working style","interview"],
+  ["I\'d like to walk you through a specific example.","用具体案例回答问题（STAR法则引入）","Signal that you will use a structured example","interview"],
+  ["The situation was...","STAR法则：描述情境","Set the scene in a STAR-format answer","interview"],
+  ["My task was to...","STAR法则：描述任务","Explain your responsibility in the STAR method","interview"],
+  ["The action I took was...","STAR法则：描述行动","Describe what you did in the STAR method","interview"],
+  ["As a result, we were able to...","STAR法则：描述结果","Share the outcome in a STAR-format answer","interview"],
+  ["I\'m currently looking for a role that offers...","说明求职诉求","Articulate what you are seeking in your next role","interview"],
+  ["My reason for leaving is that I\'m looking for more growth opportunities.","解释离职原因","Give a positive and professional reason for leaving","interview"],
+  ["I\'m open to discussing the compensation package.","表示愿意商讨薪资","Signal flexibility on salary in a professional way","interview"],
+  ["Based on my research and experience, I\'m looking for something in the range of...","给出薪资预期","State a salary expectation based on research","interview"],
+  ["I have a competing offer, but this role is my first choice.","提及竞争offer，表达优先意向","Use a competing offer tactfully to signal preference","interview"],
+  ["I\'m very interested and would love to move forward.","表达强烈意愿推进下一步","Clearly express your desire to proceed","interview"],
+  ["What\'s the timeline for the hiring process?","询问招聘时间线","Ask about next steps and timing","interview"],
+  ["When might I expect to hear back?","询问何时收到回复","Politely ask for a follow-up timeline","interview"],
+  ["Is there anything you\'d like me to clarify or expand on?","主动询问是否需要补充","Invite the interviewer to probe further","interview"],
+  ["Do you have any concerns about my candidacy?","主动了解面试官的顾虑","Proactively address any doubts the interviewer may have","interview"],
+  ["I believe my background in X makes me a strong fit for this role.","强调背景与岗位匹配度","Directly connect your experience to the job requirements","interview"],
+  ["I\'m a quick learner and I\'ve picked up new skills rapidly in past roles.","强调学习能力","Highlight your ability to adapt and grow","interview"],
+  ["I thrive under pressure and consistently meet tight deadlines.","强调抗压与执行力","Emphasise resilience and delivery under pressure","interview"],
+  ["I\'m data-driven and always back my decisions with evidence.","强调数据导向的决策风格","Highlight an evidence-based approach to work","interview"],
+  ["I bring a cross-functional perspective, having worked across X and Y teams.","强调跨部门视角","Show breadth of experience across different functions","interview"],
+  ["I\'ve led teams of up to X people.","描述管理经验","Quantify your leadership experience","interview"],
+  ["I\'m comfortable presenting to senior leadership.","展示向上汇报的能力","Signal confidence in executive-level communication","interview"],
+  ["I enjoy mentoring junior team members.","展示指导他人的意愿","Show leadership interest beyond formal titles","interview"],
+  ["I\'ve managed end-to-end projects from scoping to delivery.","展示项目全流程管理经验","Demonstrate full-cycle project ownership","interview"],
+  ["I\'m familiar with tools like...","介绍熟悉的工具","List relevant tools and technologies","interview"],
+  ["I\'ve worked in both startup and corporate environments.","描述多元工作背景","Show adaptability across different company types","interview"],
+  ["I was responsible for driving a X% improvement in...","用数据量化成就","Use metrics to make your achievement concrete","interview"],
+  ["I spearheaded the initiative to...","描述主导推进某项目","Show that you led rather than just participated","interview"],
+  ["I collaborated closely with stakeholders to align on priorities.","描述利益相关方协作","Demonstrate stakeholder management skills","interview"],
+  ["I would describe my management style as...","描述管理风格","Articulate how you lead and motivate a team","interview"],
+  ["I give regular feedback and believe in transparency.","强调反馈文化","Highlight your commitment to open communication","interview"],
+  ["I\'m passionate about building inclusive teams.","表达对多元包容团队的重视","Signal awareness of diversity and inclusion","interview"],
+  ["Where do you see this role going in the next year or two?","了解职位未来发展","Show ambition and interest in growth","interview"],
+  ["What are the growth opportunities within the company?","了解公司内部晋升通道","Ask about career progression paths","interview"],
+  ["How does the company support professional development?","询问职业发展支持","Ask about training and development resources","interview"],
+  ["Is there anything about my background I can clarify?","主动给面试官提问机会","Give the interviewer space to raise any concerns","interview"],
+  ["Thank you so much for your time today.","面试结束致谢","Close the interview with genuine gratitude","interview"],
+  ["I really enjoyed learning more about the team and the role.","表达对面试内容的正面反馈","End on a positive and enthusiastic note","interview"],
+  ["I\'m very enthusiastic about the direction the company is heading.","对公司方向表示认同","Show alignment with the company\'s vision","interview"],
+  ["I look forward to hearing from you.","期待后续消息","Close with a polite expression of anticipation","interview"],
+  ["I\'ll follow up with a thank-you note.","告知会发送感谢信","Signal that you will send a follow-up email","interview"],
+  ["Is it okay if I connect with you on LinkedIn?","询问是否可以在LinkedIn上联系","Ask permission to connect professionally after the interview","interview"],
+  ["I\'m confident I can make a meaningful contribution here.","表达对贡献的信心","Close with a strong, confident statement of intent","interview"],
 ];
 
-let data = RAW.map((r, i) => ({ id: i+1, phrase: r[0], note: r[1], category: r[2] }));
-let nextId = data.length + 1;
+const STORAGE_KEY = 'phrase-corpus-v2';
+const BASE_DATA = RAW.map((r,i) => ({id:i+1,phrase:r[0],noteZh:r[1],noteEn:r[2],category:r[3]}));
+
+function loadData() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const s = JSON.parse(saved);
+      const deletedIds = new Set(s.deleted||[]);
+      const edits = s.edits||{};
+      const added = s.added||[];
+      const merged = BASE_DATA
+        .filter(d=>!deletedIds.has(d.id))
+        .map(d=>edits[d.id]?Object.assign({},d,edits[d.id]):Object.assign({},d));
+      return added.concat(merged);
+    }
+  } catch(e){}
+  return BASE_DATA.map(d=>Object.assign({},d));
+}
+
+function persist() {
+  try {
+    const baseIds = new Set(BASE_DATA.map(d=>d.id));
+    const deleted = BASE_DATA.filter(b=>!data.find(d=>d.id===b.id)).map(b=>b.id);
+    const edits = {};
+    data.forEach(d=>{
+      if(!baseIds.has(d.id))return;
+      const orig=BASE_DATA.find(b=>b.id===d.id);
+      if(orig.phrase!==d.phrase||orig.noteZh!==d.noteZh||orig.noteEn!==d.noteEn||orig.category!==d.category)
+        edits[d.id]={phrase:d.phrase,noteZh:d.noteZh,noteEn:d.noteEn,category:d.category};
+    });
+    const added=data.filter(d=>!baseIds.has(d.id));
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({deleted,edits,added}));
+  } catch(e){}
+}
+
+let data = loadData();
+let nextId = data.reduce((m,d)=>Math.max(m,d.id),0)+1;
 let activeFilter = 'all';
 let currentPage = 1;
 const PAGE_SIZE = 24;
@@ -882,15 +929,17 @@ function filtered() {
 }
 
 function render() {
-  // filter row
+  const cats = getCats();
   const allCount = data.length;
-  document.getElementById('total-badge').textContent = '共 ' + allCount + ' 条';
-  const cats = [['all', '全部 ('+allCount+')'], ...Object.entries(CATS).map(([k,v]) => {
-    const c = data.filter(d => d.category === k).length;
-    return [k, v + ' (' + c + ')'];
-  })];
-  document.getElementById('filter-row').innerHTML = cats.map(([k,label]) =>
-    '<button class="fil-btn'+(activeFilter===k?' active':'')+'" onclick="setFilter(\''+k+'\')">'+label+'</button>'
+  const isZh = lang === 'zh';
+  document.getElementById('total-badge').textContent = isZh ? '共 '+allCount+' 条' : allCount+' expressions';
+  const filterItems = [['all', isZh ? '全部 ('+allCount+')' : 'All ('+allCount+')'],
+    ...Object.entries(cats).map(([k,v]) => {
+      const c = data.filter(d => d.category === k).length;
+      return [k, v + ' (' + c + ')'];
+    })];
+  document.getElementById('filter-row').innerHTML = filterItems.map(([k,label]) =>
+    '<button class="fil-btn'+(activeFilter===k?' active':'')+'" onclick="setFilter(\'' + k + '\')">' + label + '</button>'
   ).join('');
 
   const items = filtered();
@@ -898,39 +947,41 @@ function render() {
   if (currentPage > totalPages) currentPage = 1;
   const pageItems = items.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
 
-  document.getElementById('meta-txt').textContent = '找到 ' + items.length + ' 条 · 第 ' + currentPage + ' / ' + totalPages + ' 页';
+  document.getElementById('meta-txt').textContent = isZh
+    ? '找到 '+items.length+' 条 · 第 '+currentPage+' / '+totalPages+' 页'
+    : items.length+' results · Page '+currentPage+' of '+totalPages;
 
   const grid = document.getElementById('grid');
   if (!items.length) {
-    grid.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div>没有找到匹配的表达</div></div>';
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">◎</div><div>'+(isZh?'没有找到匹配的表达':'No expressions found')+'</div></div>';
     document.getElementById('pagination').innerHTML = '';
     return;
   }
 
   grid.innerHTML = pageItems.map(d => {
-    const label = CATS[d.category] || '通用职场';
+    const label = cats[d.category] || (isZh ? '通用' : 'General');
     const cls = 'c-' + (d.category || 'general');
+    const note = isZh ? (d.noteZh || d.noteEn || '') : (d.noteEn || d.noteZh || '');
     return '<div class="card">' +
       '<div class="card-top">' +
-        '<span class="cat-badge '+cls+'">'+label+'</span>' +
+        '<span class="cat-badge ' + cls + '">' + label + '</span>' +
         '<div class="card-actions">' +
-          '<button class="ic-btn" title="复制" onclick="copyPhrase('+d.id+')">⎘</button>' +
-          '<button class="ic-btn" title="编辑" onclick="openModal('+d.id+')">✎</button>' +
-          '<button class="ic-btn" title="删除" onclick="delItem('+d.id+')">✕</button>' +
+          '<button class="ic-btn" title="Copy" onclick="copyPhrase(' + d.id + ')">⎘</button>' +
+          '<button class="ic-btn" title="Edit" onclick="openModal(' + d.id + ')">✎</button>' +
+          '<button class="ic-btn" title="Delete" onclick="delItem(' + d.id + ')">✕</button>' +
         '</div>' +
       '</div>' +
-      '<div class="card-phrase">'+escHtml(d.phrase)+'</div>' +
-      '<div class="card-note">'+escHtml(d.note)+'</div>' +
+      '<div class="card-phrase">' + escHtml(d.phrase) + '</div>' +
+      '<div class="card-note">' + escHtml(note) + '</div>' +
     '</div>';
   }).join('');
 
-  // pagination
   const pg = document.getElementById('pagination');
   if (totalPages <= 1) { pg.innerHTML = ''; return; }
   let html = '<button class="pg-btn" onclick="goPage('+(currentPage-1)+')" '+(currentPage===1?'disabled':'')+'>‹</button>';
   let prev = 0;
   for (let i = 1; i <= totalPages; i++) {
-    if (i===1||i===totalPages||Math.abs(i-currentPage)<=2) {
+    if (i===1 || i===totalPages || Math.abs(i-currentPage) <= 2) {
       if (prev && i - prev > 1) html += '<span class="pg-dots">…</span>';
       html += '<button class="pg-btn'+(i===currentPage?' active':'')+'" onclick="goPage('+i+')">'+i+'</button>';
       prev = i;
@@ -940,8 +991,9 @@ function render() {
   pg.innerHTML = html;
 }
 
+
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return s.replace(/&/g,'&amp;').replace(/\x3C/g,'&lt;').replace(/\x3E/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function goPage(p) {
@@ -965,20 +1017,33 @@ function copyPhrase(id) {
   setTimeout(() => t.classList.remove('show'), 1800);
 }
 
-function delItem(id) {
-  if (!confirm('确认删除这条表达？')) return;
-  data = data.filter(x => x.id !== id);
+function delItem(id){
+  if(!confirm(lang==='zh'?'确认删除这条表达？':'Delete this expression?'))return;
+  data=data.filter(x=>x.id!==id);
+  persist();
   render();
 }
 
+function updateModalUI(){
+  const isZh=lang==='zh';
+  const cats=getCats();
+  document.getElementById('modal-cancel-btn').textContent=isZh?'取消':'Cancel';
+  const sel=document.getElementById('m-cat');
+  const cur=sel.value;
+  sel.innerHTML=Object.entries(cats).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('');
+  if(cur) sel.value=cur;
+}
 function openModal(id) {
-  editingId = id || null;
-  const d = id ? data.find(x => x.id === id) : null;
-  document.getElementById('modal-title').textContent = d ? '编辑表达' : '添加新表达';
-  document.getElementById('modal-save-btn').textContent = d ? '保存' : '添加';
-  document.getElementById('m-phrase').value = d ? d.phrase : '';
-  document.getElementById('m-note').value = d ? d.note : '';
-  document.getElementById('m-cat').value = d ? d.category : 'meeting';
+  editingId=id||null;
+  const d=id?data.find(x=>x.id===id):null;
+  const isZh=lang==='zh';
+  document.getElementById('modal-title').textContent=d?(isZh?'编辑表达':'Edit Expression'):(isZh?'添加新表达':'Add Expression');
+  document.getElementById('modal-save-btn').textContent=d?(isZh?'保存':'Save'):(isZh?'添加':'Add');
+  document.getElementById('m-phrase').value=d?d.phrase:'';
+  document.getElementById('m-note-en').value=d?(d.noteEn||''):'';
+  document.getElementById('m-note-zh').value=d?(d.noteZh||''):'';
+  updateModalUI();
+  if(d) document.getElementById('m-cat').value=d.category;
   document.getElementById('modal-bg').classList.add('open');
 }
 
@@ -987,19 +1052,20 @@ function closeModal() {
   editingId = null;
 }
 
-function saveModal() {
-  const phrase = document.getElementById('m-phrase').value.trim();
-  const note = document.getElementById('m-note').value.trim();
-  const cat = document.getElementById('m-cat').value;
-  if (!phrase) { alert('请输入英文表达'); return; }
-  if (editingId) {
-    const d = data.find(x => x.id === editingId);
-    if (d) { d.phrase = phrase; d.note = note; d.category = cat; }
-  } else {
-    data.unshift({ id: nextId++, phrase, note, category: cat });
+function saveModal(){
+  const phrase=document.getElementById('m-phrase').value.trim();
+  const noteEn=document.getElementById('m-note-en').value.trim();
+  const noteZh=document.getElementById('m-note-zh').value.trim();
+  const cat=document.getElementById('m-cat').value;
+  const isZh=lang==='zh';
+  if(!phrase){alert(isZh?'请输入英文表达':'Please enter an expression');return;}
+  if(editingId){
+    const d=data.find(x=>x.id===editingId);
+    if(d){d.phrase=phrase;d.noteEn=noteEn;d.noteZh=noteZh;d.category=cat;}
+  }else{
+    data.unshift({id:nextId++,phrase,noteEn,noteZh,category:cat});
   }
-  closeModal();
-  render();
+  closeModal();persist();render();
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
